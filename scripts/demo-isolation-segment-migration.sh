@@ -650,6 +650,82 @@ display_after_state() {
     echo ""
 }
 
+display_comparison() {
+    section_header "BEFORE vs AFTER"
+
+    local before after
+    before=$(jq -r '.before' "$STATE_FILE")
+    after=$(jq -r '.after' "$STATE_FILE")
+
+    if [[ "$DEMO_MODE" == "interactive" ]]; then
+        # Pretty table format
+        echo "┌─────────────────────────┬──────────────────────┬─────────────────────┐"
+        echo "│ Attribute               │ BEFORE               │ AFTER               │"
+        echo "├─────────────────────────┼──────────────────────┼─────────────────────┤"
+
+        printf "│ %-23s │ %-20s │ ${GREEN}%-19s${NC} │\n" \
+            "Isolation Segment" \
+            "$(echo "$before" | jq -r '.cf_cli.isolation_segment // "(not set)"')" \
+            "$(echo "$after" | jq -r '.cf_cli.isolation_segment') ✨"
+
+        if [[ "$DEMO_SKIP_BOSH" != "true" ]]; then
+            printf "│ %-23s │ %-20s │ ${GREEN}%-19s${NC} │\n" \
+                "BOSH Deployment" \
+                "$(echo "$before" | jq -r '.bosh.tas_deployment' | cut -c1-17)..." \
+                "$(echo "$after" | jq -r '.bosh.iso_deployment' | cut -c1-14)... ✨"
+
+            printf "│ %-23s │ %-20s │ ${GREEN}%-19s${NC} │\n" \
+                "Instance Group" \
+                "$(echo "$before" | jq -r '.bosh.instance_group')/0" \
+                "$(echo "$after" | jq -r '.bosh.instance_group' | cut -c1-15)... ✨"
+
+            printf "│ %-23s │ %-20s │ ${GREEN}%-19s${NC} │\n" \
+                "Cell IP" \
+                "$(echo "$before" | jq -r '.bosh.cell_ip')" \
+                "$(echo "$after" | jq -r '.bosh.cell_ip') ✨"
+
+            printf "│ %-23s │ %-20s │ ${GREEN}%-19s${NC} │\n" \
+                "Placement Tags" \
+                "none" \
+                "$(echo "$after" | jq -r '.bosh.placement_tags[0]') ✨"
+        fi
+
+        local app_url
+        app_url=$(cf app "$DEMO_APP_NAME" | grep "routes:" | awk '{print $2}' | cut -c1-17)
+
+        printf "│ %-23s │ %-20s │ %-19s │\n" \
+            "App URL" \
+            "${app_url}..." \
+            "${app_url}..."
+
+        printf "│ %-23s │ %-20s │ ${GREEN}%-19s${NC} │\n" \
+            "App Code Changed?" \
+            "-" \
+            "NO ✅"
+
+        printf "│ %-23s │ %-20s │ ${GREEN}%-19s${NC} │\n" \
+            "Developer Impact?" \
+            "-" \
+            "ZERO ✅"
+
+        echo "└─────────────────────────┴──────────────────────┴─────────────────────┘"
+        echo ""
+
+        echo -e "${BOLD}KEY TAKEAWAY:${NC} Same app, same URL, zero code changes - just better"
+        echo "performance and isolation by restarting in a different space configuration."
+        echo ""
+    else
+        # Compact format for automated mode
+        echo "COMPARISON:"
+        echo "  Isolation Segment: $(echo "$before" | jq -r '.cf_cli.isolation_segment // "(not set)"') → $(echo "$after" | jq -r '.cf_cli.isolation_segment')"
+        echo "  Cell IP: $(echo "$before" | jq -r '.bosh.cell_ip') → $(echo "$after" | jq -r '.bosh.cell_ip')"
+        echo "  Instance Group: $(echo "$before" | jq -r '.bosh.instance_group') → $(echo "$after" | jq -r '.bosh.instance_group')"
+        echo "  App Code Changed: NO"
+        echo "  Developer Impact: ZERO"
+        echo ""
+    fi
+}
+
 #######################################
 # Main
 #######################################
@@ -704,6 +780,9 @@ main() {
     display_after_state
 
     pause_for_demo "see side-by-side comparison"
+
+    # Display comparison
+    display_comparison
 }
 
 # Run main if script is executed directly
