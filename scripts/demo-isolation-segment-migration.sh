@@ -90,7 +90,7 @@ fatal() {
 
 debug() {
     if [[ "$VERBOSE" == "true" ]]; then
-        log "DEBUG: $@"
+        log "DEBUG: $*"
     fi
 }
 
