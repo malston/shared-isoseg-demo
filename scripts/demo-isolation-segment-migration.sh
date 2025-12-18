@@ -133,3 +133,88 @@ require_command() {
         fatal "Required command '$cmd' not found. Please install it and try again."
     fi
 }
+
+#######################################
+# Prerequisite Validation
+#######################################
+
+validate_prerequisites() {
+    phase_header "Phase 1" "Prerequisites & Setup"
+
+    # Check required commands
+    require_command cf
+    require_command jq
+    require_command curl
+
+    if [[ "$DEMO_SKIP_BOSH" != "true" ]]; then
+        require_command bosh
+    fi
+
+    success "CF CLI found ($(cf version | head -1))"
+    success "jq found ($(jq --version))"
+
+    if [[ "$DEMO_SKIP_BOSH" != "true" ]]; then
+        success "BOSH CLI found ($(bosh --version | head -1))"
+    fi
+
+    # Validate CF connection
+    info "Validating Cloud Foundry connection..."
+    if ! cf api &> /dev/null; then
+        fatal "Not connected to Cloud Foundry. Run 'cf login' first."
+    fi
+
+    if ! cf target &> /dev/null; then
+        fatal "Not authenticated to Cloud Foundry. Run 'cf login' first."
+    fi
+
+    local cf_api
+    cf_api=$(cf api | grep "API endpoint:" | awk '{print $3}')
+    success "Connected to CF API: $cf_api"
+
+    # Validate BOSH connection if not skipped
+    if [[ "$DEMO_SKIP_BOSH" != "true" ]]; then
+        info "Validating BOSH connection..."
+
+        if ! bosh env &> /dev/null; then
+            warn "Cannot connect to BOSH Director. BOSH verification will be limited."
+            warn "Set DEMO_SKIP_BOSH=true to skip BOSH verification entirely."
+            DEMO_SKIP_BOSH="true"
+        else
+            local bosh_env
+            bosh_env=$(bosh env --json | jq -r '.Tables[0].Rows[0].name' 2>/dev/null || echo "unknown")
+            success "Connected to BOSH: $bosh_env"
+        fi
+    fi
+
+    echo ""
+}
+
+#######################################
+# Main
+#######################################
+
+main() {
+    # Show banner
+    if [[ "$DEMO_MODE" == "interactive" ]]; then
+        section_header "Isolation Segment Migration Demo"
+    else
+        log "Starting isolation segment migration demo"
+    fi
+
+    # Validate prerequisites
+    validate_prerequisites
+
+    info "Demo configuration:"
+    info "  Mode: $DEMO_MODE"
+    info "  Org: $DEMO_ORG"
+    info "  Space: $DEMO_SPACE"
+    info "  Segment: $DEMO_SEGMENT"
+    info "  App: $DEMO_APP_NAME"
+    info "  BOSH verification: $([ "$DEMO_SKIP_BOSH" == "true" ] && echo "disabled" || echo "enabled")"
+    echo ""
+}
+
+# Run main if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
