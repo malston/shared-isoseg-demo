@@ -345,21 +345,37 @@ install_tile() {
         fatal "Failed to upload tile"
     fi
 
-    # Extract version from filename
+    # Get the latest available version from Ops Manager (just uploaded)
+    info "Querying available product versions..."
+    local available_versions
+    available_versions=$(om available-products --format json 2>/dev/null)
+
+    if [[ -z "$available_versions" ]]; then
+        warn "Could not query available product versions"
+        info "Manually stage the tile: om stage-product --product-name isolation-segment --product-version VERSION"
+        info "Or use Ops Manager UI: Installation Dashboard → isolation-segment → Stage"
+        return 0
+    fi
+
+    # Find the most recent isolation-segment version (likely the one just uploaded)
     local tile_version
-    tile_version=$(basename "$tile_path" | grep -oP 'isolation-segment-\K[0-9]+\.[0-9]+\.[0-9]+' || echo "")
+    tile_version=$(echo "$available_versions" | jq -r '.[] | select(.name == "isolation-segment") | .version' | head -1)
 
     if [[ -z "$tile_version" ]]; then
-        warn "Could not auto-detect tile version from filename"
-        info "Manually stage the tile using: om stage-product --product-name isolation-segment --product-version VERSION"
+        warn "Could not find isolation-segment in available products"
+        info "Manually stage the tile: om stage-product --product-name isolation-segment --product-version VERSION"
+        return 0
+    fi
+
+    info "Staging tile version $tile_version..."
+    if om stage-product --product-name isolation-segment --product-version "$tile_version"; then
+        success "Tile staged successfully"
     else
-        info "Staging tile version $tile_version..."
-        if om stage-product --product-name isolation-segment --product-version "$tile_version"; then
-            success "Tile staged successfully"
-        else
-            error "Failed to stage tile. Stage manually via Ops Manager UI."
-            return 1
-        fi
+        error "Failed to stage tile version $tile_version"
+        info "Try staging manually via Ops Manager UI or:"
+        info "  om available-products  # to see all versions"
+        info "  om stage-product --product-name isolation-segment --product-version VERSION"
+        return 1
     fi
 
     success "Tile installed and staged"
