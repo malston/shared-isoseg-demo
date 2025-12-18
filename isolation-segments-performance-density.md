@@ -21,6 +21,45 @@
 
 ---
 
+## Automation Scripts
+
+This guide includes two automation scripts for managing isolation segments:
+
+### isolation-segment-tile-migration.sh (SUPPORTED - Production)
+
+**Use for:** Production deployments that require Broadcom support
+
+- Uses official Isolation Segment tile via Ops Manager
+- Fully supported by Broadcom
+- Commands: `install-tile`, `configure-segment`, `register-segment`
+- Requires: `om` CLI and Ops Manager access
+
+**Example:**
+```bash
+./isolation-segment-tile-migration.sh install-tile --tile-path isolation-segment-6.0.x.pivotal
+./isolation-segment-tile-migration.sh configure-segment --name high-density --cell-count 120
+./isolation-segment-tile-migration.sh register-segment --name high-density
+```
+
+### isolation-segment-migration.sh (TESTING ONLY - Unsupported)
+
+**Use for:** Quick testing and development environments only
+
+- Uses direct BOSH deployment (bypasses Ops Manager)
+- NOT supported by Broadcom for production use
+- Faster for testing but lacks tile management features
+- Commands: `create-segment` (BOSH direct), `migrate`, `monitor`, `rollback`, `validate`
+- Requires: BOSH Director access
+
+**Example:**
+```bash
+./isolation-segment-migration.sh create-segment --name test-segment --cell-size 4/32 --count 10 --register
+```
+
+**⚠️ Important:** For production deployments, always use the tile-based script to maintain Broadcom support.
+
+---
+
 ## Strategy Overview
 
 **Recommended Approach: Shared Routing with Targeted Isolation**

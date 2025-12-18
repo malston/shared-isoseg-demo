@@ -27,17 +27,28 @@ This guide demonstrates how to leverage isolation segments to:
 - Rollback procedures
 - Complete implementation roadmap
 
-### 🔧 Automation Script
+### 🔧 Automation Scripts
 
-**[isolation-segment-migration.sh](./isolation-segment-migration.sh)**
+#### isolation-segment-tile-migration.sh (SUPPORTED - Production)
 
-- Production-ready bash script with comprehensive error handling
-- Subcommands: `create-segment`, `migrate`, `monitor`, `rollback`, `validate`
-- Environment variable support for sensitive data
-- Dry-run mode for safe testing
-- Batch migration with configurable delays
-- Real-time capacity monitoring
-- Automatic validation and health checks
+**[isolation-segment-tile-migration.sh](./isolation-segment-tile-migration.sh)** - **Use this for production deployments**
+
+- Official Isolation Segment tile installation via Ops Manager
+- **SUPPORTED by Broadcom** for production use
+- Commands: `install-tile`, `configure-segment`, `register-segment`
+- Requires: `om` CLI and Ops Manager credentials
+- Environment variables: `OM_TARGET`, `OM_USERNAME`, `OM_PASSWORD`
+
+#### isolation-segment-migration.sh (TESTING ONLY)
+
+**[isolation-segment-migration.sh](./isolation-segment-migration.sh)** - **Testing/development only**
+
+- Direct BOSH deployment (bypasses tile management)
+- **NOT supported by Broadcom** - for testing only
+- Commands: `create-segment` (BOSH), `migrate`, `monitor`, `rollback`, `validate`
+- Faster for quick testing but lacks production support
+- Requires: BOSH Director access
+- Environment variables: `BOSH_ENVIRONMENT`, `BOSH_CLIENT`, `BOSH_CLIENT_SECRET`
 
 ## Quick Start
 
@@ -67,12 +78,28 @@ cf target
 
 ### 3. Create an Isolation Segment
 
+**Production (Tile-based - SUPPORTED):**
 ```bash
-# Example: Create high-density segment with 120 cells at 8 vCPU / 64GB
-./isolation-segment-migration.sh create-segment \
+# Install tile
+./isolation-segment-tile-migration.sh install-tile \
+  --tile-path ~/Downloads/isolation-segment-6.0.x.pivotal
+
+# Configure via Ops Manager UI or:
+./isolation-segment-tile-migration.sh configure-segment \
   --name high-density \
-  --cell-size 8/64 \
-  --count 120 \
+  --cell-count 120
+
+# Apply changes in Ops Manager, then register
+./isolation-segment-tile-migration.sh register-segment --name high-density
+```
+
+**Testing only (BOSH direct - NOT SUPPORTED):**
+```bash
+# Quick test deployment
+./isolation-segment-migration.sh create-segment \
+  --name test-segment \
+  --cell-size 4/32 \
+  --count 10 \
   --register
 ```
 
