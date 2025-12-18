@@ -19,3 +19,4 @@ logs/
 .idea/
 *.swp
 *.swo
+.worktrees/
