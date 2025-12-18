@@ -386,6 +386,22 @@ setup_demo_environment() {
     cf target -o "$DEMO_ORG" -s "$DEMO_SPACE" &> /dev/null
     success "Targeted org '$DEMO_ORG' and space '$DEMO_SPACE'"
 
+    # Verify space has NO isolation segment assigned (clean state for demo)
+    local current_segment
+    current_segment=$(cf space "$DEMO_SPACE" | grep "isolation segment:" | awk '{print $3}')
+
+    if [[ -n "$current_segment" ]] && [[ "$current_segment" != "(not" ]]; then
+        error "Space '$DEMO_SPACE' is already assigned to isolation segment '$current_segment'"
+        error "This demo requires starting from a clean state (no isolation segment)."
+        error ""
+        error "To fix, run:"
+        error "  cf reset-space-isolation-segment $DEMO_SPACE"
+        error ""
+        fatal "Cannot proceed with space already assigned to an isolation segment."
+    fi
+
+    success "Space has no isolation segment (clean state for demo)"
+
     # Check if isolation segment exists
     if cf isolation-segments | tail -n +4 | grep -q "^${DEMO_SEGMENT}[[:space:]]*$"; then
         success "Isolation segment '$DEMO_SEGMENT' exists"
