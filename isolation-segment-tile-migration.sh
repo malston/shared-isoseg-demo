@@ -15,6 +15,7 @@ VERSION="1.0.0"
 : "${OM_USERNAME:=}"
 : "${OM_PASSWORD:=}"
 : "${OM_SKIP_SSL_VALIDATION:=false}"
+: "${PIVNET_TOKEN:=}"
 : "${DRY_RUN:=false}"
 : "${VERBOSE:=false}"
 : "${LOG_FILE:=/tmp/isolation-segment-tile.log}"
@@ -83,7 +84,8 @@ Tile-based isolation segment management for Cloud Foundry / TAS / EAR.
 Uses the official Isolation Segment tile - SUPPORTED by Broadcom.
 
 COMMANDS:
-    install-tile        Download and install Isolation Segment tile
+    download-tile       Download Isolation Segment tile from Pivnet
+    install-tile        Install Isolation Segment tile (upload and stage)
     configure-segment   Configure a deployed isolation segment tile
     register-segment    Register segment in Cloud Controller
     help                Show this help message
@@ -103,13 +105,17 @@ ENVIRONMENT VARIABLES (required):
     CF_PASSWORD        Cloud Foundry password
 
 OPTIONAL ENVIRONMENT VARIABLES:
+    PIVNET_TOKEN            Pivotal Network API token (for download-tile)
     OM_SKIP_SSL_VALIDATION  Skip SSL validation (default: false)
     DRY_RUN                 Preview mode (default: false)
     VERBOSE                 Debug logging (default: false)
 
 EXAMPLES:
+    # Download tile from Pivnet
+    $0 download-tile --version 10.2 --output-directory ~/Downloads
+
     # Install tile
-    $0 install-tile --tile-path ~/Downloads/isolation-segment-6.0.x.pivotal
+    $0 install-tile --tile-path ~/Downloads/isolation-segment-10.2.x.pivotal
 
     # Configure and deploy
     $0 configure-segment --name high-density --cell-count 120
@@ -117,8 +123,8 @@ EXAMPLES:
     # Register in CF
     $0 register-segment --name high-density
 
-DOWNLOAD TILES:
-    https://support.broadcom.com/group/ecx/productdownloads?subfamily=Isolation%20Segmentation%20for%20VMware%20Tanzu%20Platform
+PIVNET TOKEN:
+    Get your API token from: https://network.tanzu.vmware.com/users/dashboard/edit-profile
 
 DOCUMENTATION:
     https://techdocs.broadcom.com/us/en/vmware-tanzu/platform/elastic-application-runtime/6-0/eart/installing-pcf-is.html
@@ -166,6 +172,110 @@ validate_om_connection() {
     fi
 
     success "Ops Manager connection validated"
+}
+
+#######################################
+# Download Tile Command
+#######################################
+
+download_tile_usage() {
+    cat <<EOF
+Usage: $0 download-tile [OPTIONS]
+
+Download the Isolation Segment tile from Pivotal Network (Pivnet).
+
+OPTIONS:
+    --version VERSION        Major.minor version (e.g., 10.2, 6.0) (required)
+    --output-directory DIR   Download location (default: ~/Downloads)
+    -h, --help               Show this help message
+
+EXAMPLES:
+    # Download EAR 10.2.x tile
+    $0 download-tile --version 10.2
+
+    # Download to specific directory
+    $0 download-tile --version 6.0 --output-directory /tmp
+
+REQUIREMENTS:
+    - PIVNET_TOKEN environment variable must be set
+    - Get token from: https://network.tanzu.vmware.com/users/dashboard/edit-profile
+
+EOF
+}
+
+download_tile() {
+    local version=""
+    local output_dir="${HOME}/Downloads"
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --version)
+                version="$2"
+                shift 2
+                ;;
+            --output-directory)
+                output_dir="$2"
+                shift 2
+                ;;
+            -h|--help)
+                download_tile_usage
+                exit 0
+                ;;
+            *)
+                error "Unknown option: $1"
+                download_tile_usage
+                exit 1
+                ;;
+        esac
+    done
+
+    # Validate arguments
+    [[ -z "$version" ]] && fatal "Version is required. Use --version VERSION (e.g., 10.2 or 6.0)"
+    [[ -z "$PIVNET_TOKEN" ]] && fatal "PIVNET_TOKEN environment variable not set. Get token from https://network.tanzu.vmware.com/users/dashboard/edit-profile"
+
+    # Create output directory if needed
+    mkdir -p "$output_dir" || fatal "Failed to create output directory: $output_dir"
+
+    info "Downloading Isolation Segment tile from Pivnet"
+    info "  Version: $version.x (latest patch)"
+    info "  Output: $output_dir"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        warn "DRY RUN: Would download p-isolation-segment ${version}.x to $output_dir"
+        return 0
+    fi
+
+    # Validate om command
+    require_command om
+
+    # Download tile using om
+    info "Downloading tile (this may take several minutes)..."
+
+    if om download-product \
+        --pivnet-product-slug='p-isolation-segment' \
+        --file-glob="p-isolation-segment-${version}.[0-9]*.*" \
+        --product-version-regex="^${version}\.[0-9]*.*" \
+        --output-directory="$output_dir" \
+        --pivnet-api-token="$PIVNET_TOKEN"; then
+
+        success "Tile downloaded successfully"
+
+        # Find the downloaded file
+        local downloaded_file
+        downloaded_file=$(find "$output_dir" -name "p-isolation-segment-${version}.*.pivotal" -type f -print -quit 2>/dev/null)
+
+        if [[ -n "$downloaded_file" ]]; then
+            success "Downloaded: $downloaded_file"
+            info ""
+            info "Next step: Install the tile"
+            info "  $0 install-tile --tile-path \"$downloaded_file\""
+        else
+            warn "Tile downloaded but could not locate file in $output_dir"
+        fi
+    else
+        fatal "Failed to download tile. Check PIVNET_TOKEN and network connection."
+    fi
 }
 
 #######################################
@@ -274,7 +384,7 @@ OPTIONS:
     --name NAME         Segment name (required, must match placement tag)
     --cell-count COUNT  Number of Diego cells (required)
     --network NETWORK   Network for isolation segment VMs (optional)
-    --az AZ1,AZ2,AZ3   Availability zones (comma-separated, optional)
+    --az AZ1,AZ2,AZ3    Availability zones (comma-separated, optional)
     -h, --help          Show this help message
 
 EXAMPLE:
@@ -473,7 +583,7 @@ main() {
                 DRY_RUN=true
                 shift
                 ;;
-            install-tile|configure-segment|register-segment|help)
+            download-tile|install-tile|configure-segment|register-segment|help)
                 # Command found
                 break
                 ;;
@@ -490,6 +600,9 @@ main() {
     shift || true
 
     case $command in
+        download-tile)
+            download_tile "$@"
+            ;;
         install-tile)
             install_tile "$@"
             ;;
