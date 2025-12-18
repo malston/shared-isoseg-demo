@@ -123,8 +123,8 @@ EXAMPLES:
     # Register in CF
     $0 register-segment --name high-density
 
-PIVNET TOKEN:
-    Get your API token from: https://network.tanzu.vmware.com/users/dashboard/edit-profile
+DOWNLOAD TILES:
+    https://support.broadcom.com/group/ecx/productdownloads?subfamily=Isolation%20Segmentation%20for%20VMware%20Tanzu%20Platform
 
 DOCUMENTATION:
     https://techdocs.broadcom.com/us/en/vmware-tanzu/platform/elastic-application-runtime/6-0/eart/installing-pcf-is.html
@@ -198,7 +198,6 @@ EXAMPLES:
 
 REQUIREMENTS:
     - PIVNET_TOKEN environment variable must be set
-    - Get token from: https://network.tanzu.vmware.com/users/dashboard/edit-profile
 
 EOF
 }
@@ -232,7 +231,7 @@ download_tile() {
 
     # Validate arguments
     [[ -z "$version" ]] && fatal "Version is required. Use --version VERSION (e.g., 10.2 or 6.0)"
-    [[ -z "$PIVNET_TOKEN" ]] && fatal "PIVNET_TOKEN environment variable not set. Get token from https://network.tanzu.vmware.com/users/dashboard/edit-profile"
+    [[ -z "$PIVNET_TOKEN" ]] && fatal "PIVNET_TOKEN environment variable not set"
 
     # Create output directory if needed
     mkdir -p "$output_dir" || fatal "Failed to create output directory: $output_dir"
