@@ -84,7 +84,7 @@ Tile-based isolation segment management for Cloud Foundry / TAS / EAR.
 Uses the official Isolation Segment tile - SUPPORTED by Broadcom.
 
 COMMANDS:
-    download-tile       Download Isolation Segment tile from Pivnet
+    download-tile       Download Isolation Segment tile from Broadcom Support Portal
     install-tile        Install Isolation Segment tile (upload and stage)
     configure-segment   Configure a deployed isolation segment tile
     register-segment    Register segment in Cloud Controller
@@ -111,11 +111,11 @@ OPTIONAL ENVIRONMENT VARIABLES:
     VERBOSE                 Debug logging (default: false)
 
 EXAMPLES:
-    # Download tile from Pivnet
-    $0 download-tile --version 10.2 --output-directory ~/Downloads
+    # Download tile from Broadcom Support Portal
+    $0 download-tile --version 6.0 --output-directory ~/Downloads
 
     # Install tile
-    $0 install-tile --tile-path ~/Downloads/isolation-segment-10.2.x.pivotal
+    $0 install-tile --tile-path ~/Downloads/p-isolation-segment-6.0.23+LTS-T.pivotal
 
     # Configure and deploy
     $0 configure-segment --name high-density --cell-count 120
@@ -190,8 +190,8 @@ OPTIONS:
     -h, --help               Show this help message
 
 EXAMPLES:
-    # Download EAR 10.2.x tile
-    $0 download-tile --version 10.2
+    # Download EAR 6.0.x LTS tile (latest patch)
+    $0 download-tile --version 6.0
 
     # Download to specific directory
     $0 download-tile --version 6.0 --output-directory /tmp
