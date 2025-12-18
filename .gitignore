@@ -9,6 +9,9 @@ logs/
 .envrc
 .env
 
+# Certs
+*.crt
+
 # OS files
 .DS_Store
 
