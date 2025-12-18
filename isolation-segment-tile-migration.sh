@@ -185,16 +185,21 @@ Usage: $0 download-tile [OPTIONS]
 Download the Isolation Segment tile from Pivotal Network (Pivnet).
 
 OPTIONS:
-    --version VERSION        Major.minor version (e.g., 10.2, 6.0) (required)
+    --version VERSION        Version to download (required)
+                            - Major.minor (e.g., 6.0, 10.2) downloads latest patch
+                            - Full version (e.g., 6.0.23, 10.2.6) downloads specific patch
     --output-directory DIR   Download location (default: ~/Downloads)
     -h, --help               Show this help message
 
 EXAMPLES:
-    # Download EAR 6.0.x LTS tile (latest patch)
+    # Download latest 6.0.x LTS tile
     $0 download-tile --version 6.0
 
+    # Download specific patch version
+    $0 download-tile --version 6.0.23
+
     # Download to specific directory
-    $0 download-tile --version 6.0 --output-directory /tmp
+    $0 download-tile --version 10.2.6 --output-directory /tmp
 
 REQUIREMENTS:
     - PIVNET_TOKEN environment variable must be set
@@ -230,18 +235,35 @@ download_tile() {
     done
 
     # Validate arguments
-    [[ -z "$version" ]] && fatal "Version is required. Use --version VERSION (e.g., 10.2 or 6.0)"
+    [[ -z "$version" ]] && fatal "Version is required. Use --version VERSION (e.g., 10.2, 6.0.23)"
     [[ -z "$PIVNET_TOKEN" ]] && fatal "PIVNET_TOKEN environment variable not set"
 
     # Create output directory if needed
     mkdir -p "$output_dir" || fatal "Failed to create output directory: $output_dir"
 
+    # Determine if version is major.minor or major.minor.patch
+    local file_glob
+    local version_regex
+    local version_desc
+
+    if [[ "$version" =~ ^[0-9]+\.[0-9]+$ ]]; then
+        # Major.minor only (e.g., 6.0, 10.2) - download latest patch
+        file_glob="p-isolation-segment-${version}.[0-9]*.*"
+        version_regex="^${version}\.[0-9]+.*"
+        version_desc="${version}.x (latest patch)"
+    else
+        # Full version with patch (e.g., 6.0.23, 10.2.6) - download exact version
+        file_glob="p-isolation-segment-${version}*"
+        version_regex="^${version}.*"
+        version_desc="$version (exact version)"
+    fi
+
     info "Downloading Isolation Segment tile from Pivnet"
-    info "  Version: $version.x (latest patch)"
+    info "  Version: $version_desc"
     info "  Output: $output_dir"
 
     if [[ "$DRY_RUN" == "true" ]]; then
-        warn "DRY RUN: Would download p-isolation-segment ${version}.x to $output_dir"
+        warn "DRY RUN: Would download p-isolation-segment $version_desc to $output_dir"
         return 0
     fi
 
@@ -253,8 +275,8 @@ download_tile() {
 
     if om download-product \
         --pivnet-product-slug='p-isolation-segment' \
-        --file-glob="p-isolation-segment-${version}.[0-9]*.*" \
-        --product-version-regex="^${version}\.[0-9]*.*" \
+        --file-glob="$file_glob" \
+        --product-version-regex="$version_regex" \
         --output-directory="$output_dir" \
         --pivnet-api-token="$PIVNET_TOKEN"; then
 
