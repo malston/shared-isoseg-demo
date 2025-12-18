@@ -185,12 +185,13 @@ get_cell_capacity() {
         return
     fi
 
-    # Try to query the rep API on the Diego cell VM
-    # Note: BOSH SSH may not be available in all environments
-    # The display logic will fall back to CF CLI instance count if this returns {}
+    # Use cfdot on the Diego cell VM to query all cell states
+    # Source the cfdot setup script to get BBS_URL and cert paths
+    # Extract the cell state from BOSH SSH stdout, filtering by instance group
     local result
     result=$(bosh -d "$deployment" ssh "${instance_group}/${index}" \
-        -c "curl -sk https://localhost:1800/state" 2>/dev/null | grep -v "^${instance_group}" | grep -v "^Running SSH" | grep -E '^\{')
+        -c "source /var/vcap/jobs/cfdot/bin/setup && cfdot cell-states" 2>&1 \
+        | grep ': stdout |' | sed 's/.*: stdout | //' | grep -E '^\{' | head -1)
     echo "${result:-{}}"
 }
 
@@ -866,7 +867,7 @@ cleanup_demo() {
     fi
 
     # Clean up temp files
-    if [[ -f "$STATE_FILE" ]]; then
+    if [[ -f "$STATE_FILE" && "$VERBOSE" != "true" ]]; then
         rm -f "$STATE_FILE"
     fi
 
