@@ -189,6 +189,77 @@ validate_prerequisites() {
     echo ""
 }
 
+setup_demo_environment() {
+    info "Creating demo environment..."
+
+    # Create org if it doesn't exist
+    if cf org "$DEMO_ORG" &> /dev/null; then
+        debug "Org $DEMO_ORG already exists"
+    else
+        info "Creating org: $DEMO_ORG"
+        if cf create-org "$DEMO_ORG"; then
+            success "Org '$DEMO_ORG' created"
+        else
+            fatal "Failed to create org $DEMO_ORG"
+        fi
+    fi
+
+    # Create space if it doesn't exist
+    cf target -o "$DEMO_ORG" &> /dev/null
+
+    if cf space "$DEMO_SPACE" &> /dev/null; then
+        debug "Space $DEMO_SPACE already exists"
+    else
+        info "Creating space: $DEMO_SPACE"
+        if cf create-space "$DEMO_SPACE"; then
+            success "Space '$DEMO_SPACE' created"
+        else
+            fatal "Failed to create space $DEMO_SPACE"
+        fi
+    fi
+
+    # Target the space
+    cf target -o "$DEMO_ORG" -s "$DEMO_SPACE" &> /dev/null
+    success "Targeted org '$DEMO_ORG' and space '$DEMO_SPACE'"
+
+    # Check if isolation segment exists
+    if cf isolation-segments | grep -q "^${DEMO_SEGMENT}$"; then
+        success "Isolation segment '$DEMO_SEGMENT' exists"
+    else
+        warn "Isolation segment '$DEMO_SEGMENT' does not exist"
+        info "Creating isolation segment..."
+
+        if cf create-isolation-segment "$DEMO_SEGMENT"; then
+            success "Isolation segment '$DEMO_SEGMENT' created"
+        else
+            fatal "Failed to create isolation segment. You may need BOSH/Ops Manager to deploy Diego cells first."
+        fi
+    fi
+
+    # Verify segment has Diego cells (if BOSH available)
+    if [[ "$DEMO_SKIP_BOSH" != "true" ]]; then
+        info "Verifying isolation segment has Diego cells..."
+
+        local iso_deployment
+        iso_deployment=$(bosh deployments --json 2>/dev/null | jq -r '.Tables[0].Rows[] | select(.name | startswith("p-isolation-segment-")) | .name' | head -1)
+
+        if [[ -n "$iso_deployment" ]]; then
+            local cell_count
+            cell_count=$(bosh -d "$iso_deployment" instances --json 2>/dev/null | jq -r '.Tables[0].Rows | length' 2>/dev/null || echo "0")
+
+            if [[ "$cell_count" -gt 0 ]]; then
+                success "Isolation segment has $cell_count Diego cell(s)"
+            else
+                fatal "Isolation segment exists but has no Diego cells deployed. Deploy cells via Ops Manager first."
+            fi
+        else
+            warn "Could not verify Diego cells via BOSH. Continuing anyway..."
+        fi
+    fi
+
+    echo ""
+}
+
 #######################################
 # Main
 #######################################
@@ -212,6 +283,11 @@ main() {
     info "  App: $DEMO_APP_NAME"
     info "  BOSH verification: $([ "$DEMO_SKIP_BOSH" == "true" ] && echo "disabled" || echo "enabled")"
     echo ""
+
+    # Setup environment
+    setup_demo_environment
+
+    pause_for_demo "continue to app deployment"
 }
 
 # Run main if script is executed directly
