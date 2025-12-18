@@ -205,7 +205,9 @@ setup_demo_environment() {
     fi
 
     # Create space if it doesn't exist
-    cf target -o "$DEMO_ORG" &> /dev/null
+    if ! cf target -o "$DEMO_ORG" &> /dev/null; then
+        fatal "Failed to target org $DEMO_ORG"
+    fi
 
     if cf space "$DEMO_SPACE" &> /dev/null; then
         debug "Space $DEMO_SPACE already exists"
@@ -223,7 +225,7 @@ setup_demo_environment() {
     success "Targeted org '$DEMO_ORG' and space '$DEMO_SPACE'"
 
     # Check if isolation segment exists
-    if cf isolation-segments | grep -q "^${DEMO_SEGMENT}$"; then
+    if cf isolation-segments | tail -n +4 | grep -q "^${DEMO_SEGMENT}[[:space:]]*$"; then
         success "Isolation segment '$DEMO_SEGMENT' exists"
     else
         warn "Isolation segment '$DEMO_SEGMENT' does not exist"
@@ -232,7 +234,7 @@ setup_demo_environment() {
         if cf create-isolation-segment "$DEMO_SEGMENT"; then
             success "Isolation segment '$DEMO_SEGMENT' created"
         else
-            fatal "Failed to create isolation segment. You may need BOSH/Ops Manager to deploy Diego cells first."
+            fatal "Failed to create isolation segment. Check permissions and isolation segment quota."
         fi
     fi
 
