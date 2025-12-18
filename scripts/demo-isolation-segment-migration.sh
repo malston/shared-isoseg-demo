@@ -524,6 +524,132 @@ enable_isolation_segment() {
     echo ""
 }
 
+capture_after_state() {
+    info "Capturing AFTER state..."
+
+    # Get app GUID
+    local app_guid
+    app_guid=$(cf app "$DEMO_APP_NAME" --guid)
+
+    # Method 1: CF CLI verification
+    local cf_isolation_segment
+    cf_isolation_segment=$(cf app "$DEMO_APP_NAME" | grep "isolation segment:" | awk '{print $3}' || echo "(not set)")
+
+    # Method 2: BOSH physical placement
+    local tas_deployment
+    local iso_deployment
+    local shared_cell_group
+    local cell_ip
+
+    tas_deployment=$(get_tas_deployment)
+    iso_deployment=$(get_iso_deployment)
+    shared_cell_group=$(get_shared_cell_instance_group "$tas_deployment")
+    cell_ip=$(get_app_cell_ip)
+
+    # Method 3: Capacity metrics
+    local shared_capacity="{}"
+    local isolated_capacity="{}"
+
+    if [[ -n "$tas_deployment" ]]; then
+        shared_capacity=$(get_cell_capacity "$tas_deployment" "$shared_cell_group" 0)
+    fi
+
+    if [[ -n "$iso_deployment" ]]; then
+        isolated_capacity=$(get_cell_capacity "$iso_deployment" "isolated_diego_cell" 0)
+    fi
+
+    # Store AFTER state
+    local after_state
+    after_state=$(cat <<EOF
+{
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "cf_cli": {
+    "app_name": "$DEMO_APP_NAME",
+    "app_guid": "$app_guid",
+    "isolation_segment": $([ "$cf_isolation_segment" == "(not set)" ] && echo "null" || echo "\"$cf_isolation_segment\""),
+    "state": "$(cf app "$DEMO_APP_NAME" | grep "^state:" | awk '{print $2}')"
+  },
+  "bosh": {
+    "tas_deployment": "$tas_deployment",
+    "iso_deployment": "$iso_deployment",
+    "instance_group": "isolated_diego_cell",
+    "cell_ip": "$cell_ip",
+    "placement_tags": ["$DEMO_SEGMENT"]
+  },
+  "capacity": {
+    "shared_cell": $(echo "$shared_capacity" | jq '{containers_total: .TotalResources.Containers, containers_available: .AvailableResources.Containers}' 2>/dev/null || echo '{}'),
+    "isolated_cell": $(echo "$isolated_capacity" | jq '{containers_total: .TotalResources.Containers, containers_available: .AvailableResources.Containers}' 2>/dev/null || echo '{}')
+  },
+  "app_env": {
+    "CF_INSTANCE_IP": "$cell_ip"
+  }
+}
+EOF
+    )
+
+    # Merge with existing state file
+    local merged_state
+    merged_state=$(jq --argjson after "$after_state" '. + {"after": $after}' "$STATE_FILE")
+    echo "$merged_state" > "$STATE_FILE"
+
+    success "AFTER state captured"
+    debug "State saved to $STATE_FILE"
+
+    echo ""
+}
+
+display_after_state() {
+    section_header "AFTER STATE (App on Isolated Diego Cells)"
+
+    local after
+    after=$(jq -r '.after' "$STATE_FILE")
+
+    echo -e "${BOLD}1️⃣  CF CLI Verification:${NC}"
+    echo "   App Name:           $(echo "$after" | jq -r '.cf_cli.app_name')"
+    echo -e "   Isolation Segment:  ${GREEN}$(echo "$after" | jq -r '.cf_cli.isolation_segment // "(not set)")${NC} ✨"
+    echo "   State:              $(echo "$after" | jq -r '.cf_cli.state')"
+    echo ""
+
+    if [[ "$DEMO_SKIP_BOSH" != "true" ]]; then
+        echo -e "${BOLD}2️⃣  BOSH Physical Placement:${NC}"
+        echo -e "   Deployment:         ${GREEN}$(echo "$after" | jq -r '.bosh.iso_deployment')${NC} ✨"
+        echo -e "   Instance Group:     ${GREEN}$(echo "$after" | jq -r '.bosh.instance_group')/0${NC} ✨"
+        echo -e "   Cell IP:            ${GREEN}$(echo "$after" | jq -r '.bosh.cell_ip')${NC} ✨"
+        echo -e "   Placement Tags:     ${GREEN}$(echo "$after" | jq -r '.bosh.placement_tags[0]')${NC} ✨"
+        echo ""
+
+        echo -e "${BOLD}3️⃣  Diego Cell Capacity:${NC}"
+
+        local before
+        before=$(jq -r '.before' "$STATE_FILE")
+
+        echo "   Shared Cell ($(echo "$before" | jq -r '.bosh.cell_ip')):"
+        local shared_containers_total
+        local shared_containers_available
+        local shared_containers_used
+        shared_containers_total=$(echo "$after" | jq -r '.capacity.shared_cell.containers_total // 0')
+        shared_containers_available=$(echo "$after" | jq -r '.capacity.shared_cell.containers_available // 0')
+        shared_containers_used=$((shared_containers_total - shared_containers_available))
+        echo -e "     Containers Used:  ${GREEN}$shared_containers_used (app moved away)${NC} ✨"
+        echo ""
+
+        echo "   Isolated Cell ($(echo "$after" | jq -r '.bosh.cell_ip')):"
+        local isolated_containers_total
+        local isolated_containers_available
+        local isolated_containers_used
+        isolated_containers_total=$(echo "$after" | jq -r '.capacity.isolated_cell.containers_total // 0')
+        isolated_containers_available=$(echo "$after" | jq -r '.capacity.isolated_cell.containers_available // 0')
+        isolated_containers_used=$((isolated_containers_total - isolated_containers_available))
+        echo -e "     Containers Used:  ${GREEN}$isolated_containers_used (our app is here)${NC} ✨"
+        echo "     Available:        $isolated_containers_available"
+        echo ""
+    fi
+
+    echo -e "${BOLD}4️⃣  App Environment:${NC}"
+    echo -e "   CF_INSTANCE_IP:     ${GREEN}$(echo "$after" | jq -r '.app_env.CF_INSTANCE_IP')${NC} ✨"
+    echo ""
+}
+
 #######################################
 # Main
 #######################################
@@ -569,7 +695,15 @@ main() {
     # Enable isolation segment
     enable_isolation_segment
 
+    # Capture AFTER state
+    capture_after_state
+
     pause_for_demo "see AFTER state"
+
+    # Display AFTER state
+    display_after_state
+
+    pause_for_demo "see side-by-side comparison"
 }
 
 # Run main if script is executed directly
