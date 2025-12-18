@@ -230,6 +230,14 @@ capture_before_state() {
         shared_capacity=$(get_cell_capacity "$tas_deployment" "$shared_cell_group" 0)
     fi
 
+    # Parse capacity JSON safely
+    local shared_cell_capacity
+    if echo "$shared_capacity" | jq empty 2>/dev/null; then
+        shared_cell_capacity=$(echo "$shared_capacity" | jq '{containers_total: .TotalResources.Containers, containers_available: .AvailableResources.Containers}' 2>/dev/null)
+    else
+        shared_cell_capacity="{}"
+    fi
+
     # Store state as JSON
     local before_state
     before_state=$(cat <<EOF
@@ -248,7 +256,7 @@ capture_before_state() {
     "placement_tags": []
   },
   "capacity": {
-    "shared_cell": $(echo "$shared_capacity" | jq '{containers_total: .TotalResources.Containers, containers_available: .AvailableResources.Containers}' 2>/dev/null || echo '{}')
+    "shared_cell": $shared_cell_capacity
   },
   "app_env": {
     "CF_INSTANCE_IP": "$cell_ip"
@@ -257,8 +265,14 @@ capture_before_state() {
 EOF
     )
 
-    # Save to temp file
-    echo "$before_state" | jq '{"before": .}' > "$STATE_FILE"
+    # Validate and save to temp file
+    if echo "$before_state" | jq empty 2>/dev/null; then
+        echo "$before_state" | jq '{"before": .}' > "$STATE_FILE"
+    else
+        error "Generated invalid JSON for BEFORE state"
+        echo "$before_state"
+        fatal "BEFORE state JSON validation failed"
+    fi
 
     success "BEFORE state captured"
     debug "State saved to $STATE_FILE"
