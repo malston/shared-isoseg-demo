@@ -715,15 +715,15 @@ display_comparison() {
         echo "performance and isolation by restarting in a different space configuration."
         echo ""
     else
+    else
         # Compact format for automated mode
         echo "COMPARISON:"
-        echo "  Isolation Segment: $(echo "$before" | jq -r '.cf_cli.isolation_segment // "(not set)"') → $(echo "$after" | jq -r '.cf_cli.isolation_segment')"
-        echo "  Cell IP: $(echo "$before" | jq -r '.bosh.cell_ip') → $(echo "$after" | jq -r '.bosh.cell_ip')"
-        echo "  Instance Group: $(echo "$before" | jq -r '.bosh.instance_group') → $(echo "$after" | jq -r '.bosh.instance_group')"
+        echo "  Isolation Segment: $(echo "$before" | jq -r '.cf_cli.isolation_segment // "(not set)"') -> $(echo "$after" | jq -r '.cf_cli.isolation_segment')"
+        echo "  Cell IP: $(echo "$before" | jq -r '.bosh.cell_ip') -> $(echo "$after" | jq -r '.bosh.cell_ip')"
+        echo "  Instance Group: $(echo "$before" | jq -r '.bosh.instance_group') -> $(echo "$after" | jq -r '.bosh.instance_group')"
         echo "  App Code Changed: NO"
         echo "  Developer Impact: ZERO"
         echo ""
-    fi
 }
 
 #######################################
