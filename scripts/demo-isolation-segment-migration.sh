@@ -232,7 +232,7 @@ capture_before_state() {
     "app_name": "$DEMO_APP_NAME",
     "app_guid": "$app_guid",
     "isolation_segment": $([ "$cf_isolation_segment" == "(not set)" ] && echo "null" || echo "\"$cf_isolation_segment\""),
-    "state": "$(cf app "$DEMO_APP_NAME" | grep "^state:" | awk '{print $2}')"
+    "state": "$(cf app "$DEMO_APP_NAME" | grep "^requested state:" | awk '{print $3}')"
   },
   "bosh": {
     "tas_deployment": "$tas_deployment",
@@ -540,7 +540,7 @@ enable_isolation_segment() {
 
     # Verify app is still accessible
     local app_state
-    app_state=$(cf app "$DEMO_APP_NAME" | grep "^state:" | awk '{print $2}')
+    app_state=$(cf app "$DEMO_APP_NAME" | grep "^requested state:" | awk '{print $3}')
 
     if [[ "$app_state" != "started" ]]; then
         error "App is not in started state: $app_state"
@@ -594,7 +594,7 @@ capture_after_state() {
     "app_name": "$DEMO_APP_NAME",
     "app_guid": "$app_guid",
     "isolation_segment": $([ "$cf_isolation_segment" == "(not set)" ] && echo "null" || echo "\"$cf_isolation_segment\""),
-    "state": "$(cf app "$DEMO_APP_NAME" | grep "^state:" | awk '{print $2}')"
+    "state": "$(cf app "$DEMO_APP_NAME" | grep "^requested state:" | awk '{print $3}')"
   },
   "bosh": {
     "tas_deployment": "$tas_deployment",
