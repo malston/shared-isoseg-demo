@@ -606,7 +606,7 @@ display_after_state() {
 
     echo -e "${BOLD}1️⃣  CF CLI Verification:${NC}"
     echo "   App Name:           $(echo "$after" | jq -r '.cf_cli.app_name')"
-    echo -e "   Isolation Segment:  ${GREEN}$(echo "$after" | jq -r '.cf_cli.isolation_segment // "(not set)")${NC} ✨"
+    echo -e "   Isolation Segment:  ${GREEN}$(echo "$after" | jq -r '.cf_cli.isolation_segment // "(not set)"')${NC} ✨"
     echo "   State:              $(echo "$after" | jq -r '.cf_cli.state')"
     echo ""
 
@@ -715,7 +715,6 @@ display_comparison() {
         echo "performance and isolation by restarting in a different space configuration."
         echo ""
     else
-    else
         # Compact format for automated mode
         echo "COMPARISON:"
         echo "  Isolation Segment: $(echo "$before" | jq -r '.cf_cli.isolation_segment // "(not set)"') -> $(echo "$after" | jq -r '.cf_cli.isolation_segment')"
@@ -724,6 +723,7 @@ display_comparison() {
         echo "  App Code Changed: NO"
         echo "  Developer Impact: ZERO"
         echo ""
+    fi
 }
 
 #######################################
