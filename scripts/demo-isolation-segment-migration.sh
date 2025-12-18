@@ -190,10 +190,16 @@ get_cell_capacity() {
     # The cell_id is the BOSH instance GUID, available in /var/vcap/instance/id
     # Source the cfdot setup script to get BBS_URL and cert paths
     local result
-    result=$(bosh -d "$deployment" ssh "${instance_group}/${index}" \
+    result=$(timeout 30 bosh -d "$deployment" ssh "${instance_group}/${index}" \
         -c "CELL_ID=\$(cat /var/vcap/instance/id) && source /var/vcap/jobs/cfdot/bin/setup && cfdot cell-state \$CELL_ID" 2>&1 \
-        | grep ': stdout |' | sed 's/.*: stdout | //' | tr -d '\n')
-    echo "${result:-{}}"
+        | grep ': stdout |' | sed 's/.*: stdout | //' | head -1)
+
+    # Validate it's valid JSON, otherwise return empty
+    if echo "$result" | jq empty 2>/dev/null; then
+        echo "$result"
+    else
+        echo "{}"
+    fi
 }
 
 get_app_cell_ip() {
