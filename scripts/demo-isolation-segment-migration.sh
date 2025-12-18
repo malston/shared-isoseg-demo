@@ -135,6 +135,168 @@ require_command() {
 }
 
 #######################################
+# BOSH Helper Functions
+#######################################
+
+get_tas_deployment() {
+    if [[ "$DEMO_SKIP_BOSH" == "true" ]]; then
+        echo ""
+        return
+    fi
+
+    bosh deployments --json 2>/dev/null | jq -r '.Tables[0].Rows[] | select(.name | startswith("cf-")) | .name' | head -1
+}
+
+get_iso_deployment() {
+    if [[ "$DEMO_SKIP_BOSH" == "true" ]]; then
+        echo ""
+        return
+    fi
+
+    bosh deployments --json 2>/dev/null | jq -r '.Tables[0].Rows[] | select(.name | startswith("p-isolation-segment-")) | .name' | head -1
+}
+
+get_shared_cell_instance_group() {
+    local tas_deployment="$1"
+
+    if [[ -z "$tas_deployment" ]]; then
+        echo "compute"
+        return
+    fi
+
+    # Detect if Small Footprint (compute) or regular TAS (diego_cell)
+    local instance
+    instance=$(bosh -d "$tas_deployment" instances --json 2>/dev/null | jq -r '.Tables[0].Rows[0].instance' 2>/dev/null || echo "")
+
+    if [[ "$instance" =~ ^compute/ ]]; then
+        echo "compute"
+    else
+        echo "diego_cell"
+    fi
+}
+
+get_cell_capacity() {
+    local deployment="$1"
+    local instance_group="$2"
+    local index="${3:-0}"
+
+    if [[ "$DEMO_SKIP_BOSH" == "true" ]] || [[ -z "$deployment" ]]; then
+        echo "{}"
+        return
+    fi
+
+    bosh -d "$deployment" ssh "${instance_group}/${index}" \
+        -c "curl -s localhost:1800/state" 2>/dev/null || echo "{}"
+}
+
+get_app_cell_ip() {
+    cf ssh "$DEMO_APP_NAME" -c 'echo $CF_INSTANCE_IP' 2>/dev/null || echo "unknown"
+}
+
+#######################################
+# State Capture Functions
+#######################################
+
+capture_before_state() {
+    info "Capturing BEFORE state..."
+
+    # Get app GUID
+    local app_guid
+    app_guid=$(cf app "$DEMO_APP_NAME" --guid)
+
+    # Method 1: CF CLI verification
+    local cf_isolation_segment
+    cf_isolation_segment=$(cf app "$DEMO_APP_NAME" | grep "isolation segment:" | awk '{print $3}' || echo "(not set)")
+
+    # Method 2: BOSH physical placement
+    local tas_deployment
+    local shared_cell_group
+    local cell_ip
+
+    tas_deployment=$(get_tas_deployment)
+    shared_cell_group=$(get_shared_cell_instance_group "$tas_deployment")
+    cell_ip=$(get_app_cell_ip)
+
+    # Method 3: Capacity metrics
+    local shared_capacity="{}"
+    if [[ -n "$tas_deployment" ]]; then
+        shared_capacity=$(get_cell_capacity "$tas_deployment" "$shared_cell_group" 0)
+    fi
+
+    # Store state as JSON
+    local before_state
+    before_state=$(cat <<EOF
+{
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "cf_cli": {
+    "app_name": "$DEMO_APP_NAME",
+    "app_guid": "$app_guid",
+    "isolation_segment": $([ "$cf_isolation_segment" == "(not set)" ] && echo "null" || echo "\"$cf_isolation_segment\""),
+    "state": "$(cf app "$DEMO_APP_NAME" | grep "^state:" | awk '{print $2}')"
+  },
+  "bosh": {
+    "tas_deployment": "$tas_deployment",
+    "instance_group": "$shared_cell_group",
+    "cell_ip": "$cell_ip",
+    "placement_tags": []
+  },
+  "capacity": {
+    "shared_cell": $(echo "$shared_capacity" | jq '{containers_total: .TotalResources.Containers, containers_available: .AvailableResources.Containers}' 2>/dev/null || echo '{}')
+  },
+  "app_env": {
+    "CF_INSTANCE_IP": "$cell_ip"
+  }
+}
+EOF
+    )
+
+    # Save to temp file
+    echo "$before_state" | jq '{"before": .}' > "$STATE_FILE"
+
+    success "BEFORE state captured"
+    debug "State saved to $STATE_FILE"
+
+    echo ""
+}
+
+display_before_state() {
+    section_header "BEFORE STATE (App on Shared Diego Cells)"
+
+    local before
+    before=$(jq -r '.before' "$STATE_FILE")
+
+    echo -e "${BOLD}1️⃣  CF CLI Verification:${NC}"
+    echo "   App Name:           $(echo "$before" | jq -r '.cf_cli.app_name')"
+    echo "   Isolation Segment:  $(echo "$before" | jq -r '.cf_cli.isolation_segment // "(not set)"')"
+    echo "   State:              $(echo "$before" | jq -r '.cf_cli.state')"
+    echo ""
+
+    if [[ "$DEMO_SKIP_BOSH" != "true" ]]; then
+        echo -e "${BOLD}2️⃣  BOSH Physical Placement:${NC}"
+        echo "   Deployment:         $(echo "$before" | jq -r '.bosh.tas_deployment')"
+        echo "   Instance Group:     $(echo "$before" | jq -r '.bosh.instance_group')/0"
+        echo "   Cell IP:            $(echo "$before" | jq -r '.bosh.cell_ip')"
+        echo "   Placement Tags:     none (shared cell)"
+        echo ""
+
+        echo -e "${BOLD}3️⃣  Diego Cell Capacity:${NC}"
+        echo "   Cell Type:          Shared $(echo "$before" | jq -r '.bosh.instance_group | ascii_upcase') Cell"
+        local containers_used
+        local containers_total
+        containers_total=$(echo "$before" | jq -r '.capacity.shared_cell.containers_total // 0')
+        containers_available=$(echo "$before" | jq -r '.capacity.shared_cell.containers_available // 0')
+        containers_used=$((containers_total - containers_available))
+        echo "   Containers Used:    $containers_used"
+        echo "   Available:          $containers_available"
+        echo ""
+    fi
+
+    echo -e "${BOLD}4️⃣  App Environment:${NC}"
+    echo "   CF_INSTANCE_IP:     $(echo "$before" | jq -r '.app_env.CF_INSTANCE_IP')"
+    echo ""
+}
+
+#######################################
 # Prerequisite Validation
 #######################################
 
@@ -344,7 +506,15 @@ main() {
     # Deploy app before isolation segment
     deploy_app_before_isolation
 
+    # Capture BEFORE state
+    capture_before_state
+
     pause_for_demo "see BEFORE state"
+
+    # Display BEFORE state
+    display_before_state
+
+    pause_for_demo "enable isolation segment and restart app"
 }
 
 # Run main if script is executed directly
