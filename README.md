@@ -49,7 +49,7 @@ Same space names, same routes, same URLs, same `cf push` commands. Zero coordina
 
 #### isolation-segment-tile-migration.sh (SUPPORTED - Production)
 
-**[isolation-segment-tile-migration.sh](./isolation-segment-tile-migration.sh)** - **Use this for production deployments**
+**[isolation-segment-tile-migration.sh](./scripts/isolation-segment-tile-migration.sh)** - **Use this for production deployments**
 
 - Official Isolation Segment tile installation via Ops Manager
 - **SUPPORTED by Broadcom** for production use
@@ -59,7 +59,7 @@ Same space names, same routes, same URLs, same `cf push` commands. Zero coordina
 
 #### isolation-segment-migration.sh (TESTING ONLY)
 
-**[isolation-segment-migration.sh](./isolation-segment-migration.sh)** - **Testing/development only**
+**[isolation-segment-migration.sh](./scripts/isolation-segment-migration.sh)** - **Testing/development only**
 
 - Direct BOSH deployment (bypasses tile management)
 - **NOT supported by Broadcom** - for testing only
@@ -91,7 +91,7 @@ cf api
 cf target
 
 # View script help
-./isolation-segment-migration.sh --help
+./scripts/isolation-segment-migration.sh --help
 ```
 
 ### 3. Create an Isolation Segment
@@ -100,23 +100,23 @@ cf target
 
 ```bash
 # Install tile
-./isolation-segment-tile-migration.sh install-tile \
+./scripts/isolation-segment-tile-migration.sh install-tile \
   --tile-path ~/Downloads/isolation-segment-6.0.x.pivotal
 
 # Configure via Ops Manager UI or:
-./isolation-segment-tile-migration.sh configure-segment \
+./scripts/isolation-segment-tile-migration.sh configure-segment \
   --name high-density \
   --cell-count 120
 
 # Apply changes in Ops Manager, then register
-./isolation-segment-tile-migration.sh register-segment --name high-density
+./scripts/isolation-segment-tile-migration.sh register-segment --name high-density
 ```
 
 **Testing only (BOSH direct - NOT SUPPORTED):**
 
 ```bash
 # Quick test deployment
-./isolation-segment-migration.sh create-segment \
+./scripts/isolation-segment-migration.sh create-segment \
   --name test-segment \
   --cell-size 4/32 \
   --count 10 \
@@ -127,7 +127,7 @@ cf target
 
 ```bash
 # Preview migration without executing
-./isolation-segment-migration.sh migrate \
+./scripts/isolation-segment-migration.sh migrate \
   --org production-org \
   --space prod-space \
   --segment high-density \
@@ -135,7 +135,7 @@ cf target
   --dry-run
 
 # Execute migration in batches
-./isolation-segment-migration.sh migrate \
+./scripts/isolation-segment-migration.sh migrate \
   --org production-org \
   --space prod-space \
   --segment high-density \
@@ -148,25 +148,25 @@ cf target
 
 ```bash
 # One-time capacity check
-./isolation-segment-migration.sh monitor --segment high-density
+./scripts/isolation-segment-migration.sh monitor --segment high-density
 
 # Real-time monitoring (refresh every 10 seconds)
-./isolation-segment-migration.sh monitor --segment high-density --watch 10
+./scripts/isolation-segment-migration.sh monitor --segment high-density --watch 10
 
 # Export metrics as JSON
-./isolation-segment-migration.sh monitor --segment high-density --output json
+./scripts/isolation-segment-migration.sh monitor --segment high-density --output json
 ```
 
 ### 6. Rollback if Needed
 
 ```bash
 # Rollback entire space to shared segment
-./isolation-segment-migration.sh rollback \
+./scripts/isolation-segment-migration.sh rollback \
   --org production-org \
   --space prod-space
 
 # Rollback specific apps only
-./isolation-segment-migration.sh rollback \
+./scripts/isolation-segment-migration.sh rollback \
   --org production-org \
   --space prod-space \
   --apps app1,app2,app3
@@ -327,7 +327,7 @@ cf restart APP-NAME
 
 ```bash
 # Use built-in validation
-./isolation-segment-migration.sh validate --segment SEGMENT-NAME
+./scripts/isolation-segment-migration.sh validate --segment SEGMENT-NAME
 
 # Manual checks - Cloud Foundry
 cf isolation-segments
@@ -357,7 +357,7 @@ bosh -e ENV -d "$ISO_DEPLOYMENT" ssh isolated_diego_cell/0 -c "curl -s localhost
 
 ```bash
 # Real-time monitoring
-./isolation-segment-migration.sh monitor --segment SEGMENT-NAME --watch 10
+./scripts/isolation-segment-migration.sh monitor --segment SEGMENT-NAME --watch 10
 
 # Check Diego cell utilization
 bosh -e ENV -d DEPLOYMENT ssh diego_cell/0 \
@@ -369,7 +369,7 @@ bosh -e ENV -d DEPLOYMENT ssh diego_cell/0 \
 For issues or questions:
 
 - Review the comprehensive guide: `isolation-segments-performance-density.md`
-- Check script help: `./isolation-segment-migration.sh COMMAND --help`
+- Check script help: `./scripts/isolation-segment-migration.sh COMMAND --help`
 - Consult [Broadcom Support Portal](https://support.broadcom.com/)
 - Reference [Cloud Foundry Community](https://www.cloudfoundry.org/community/)
 

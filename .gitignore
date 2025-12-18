@@ -8,6 +8,7 @@ logs/
 !*.key.example
 .envrc
 .env
+p-isolation-segment.yml
 
 # Certs
 *.crt

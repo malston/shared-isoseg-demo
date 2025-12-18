@@ -37,9 +37,9 @@ This guide includes two automation scripts for managing isolation segments:
 **Example:**
 
 ```bash
-./isolation-segment-tile-migration.sh install-tile --tile-path isolation-segment-6.0.x.pivotal
-./isolation-segment-tile-migration.sh configure-segment --name high-density --cell-count 120
-./isolation-segment-tile-migration.sh register-segment --name high-density
+./scripts/isolation-segment-tile-migration.sh install-tile --tile-path isolation-segment-6.0.x.pivotal
+./scripts/isolation-segment-tile-migration.sh configure-segment --name high-density --cell-count 120
+./scripts/isolation-segment-tile-migration.sh register-segment --name high-density
 ```
 
 ### isolation-segment-migration.sh (TESTING ONLY - Unsupported)
@@ -55,7 +55,7 @@ This guide includes two automation scripts for managing isolation segments:
 **Example:**
 
 ```bash
-./isolation-segment-migration.sh create-segment --name test-segment --cell-size 4/32 --count 10 --register
+./scripts/isolation-segment-migration.sh create-segment --name test-segment --cell-size 4/32 --count 10 --register
 ```
 
 **⚠️ Important:** For production deployments, always use the tile-based script to maintain Broadcom support.
