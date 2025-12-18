@@ -165,10 +165,11 @@ get_shared_cell_instance_group() {
     fi
 
     # Detect if Small Footprint (compute) or regular TAS (diego_cell)
-    local instance
-    instance=$(bosh -d "$tas_deployment" instances --json 2>/dev/null | jq -r '.Tables[0].Rows[0].instance' 2>/dev/null || echo "")
+    # Check for compute instance (Small Footprint) or diego_cell (regular TAS)
+    local has_compute
+    has_compute=$(bosh -d "$tas_deployment" instances --json 2>/dev/null | jq -r '.Tables[0].Rows[].instance' 2>/dev/null | grep -c "^compute/" || echo "0")
 
-    if [[ "$instance" =~ ^compute/ ]]; then
+    if [[ "$has_compute" -gt 0 ]]; then
         echo "compute"
     else
         echo "diego_cell"
