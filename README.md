@@ -13,6 +13,24 @@ This guide demonstrates how to leverage isolation segments to:
 
 **Key Benefit:** Compute isolation without network isolation = maximum performance and density gains with minimal operational complexity.
 
+### Zero Impact to Developers and Pipelines
+
+**Critical advantage:** Migration is completely transparent to developers and CI/CD pipelines.
+
+Simply assign a space to an isolation segment and restart apps - developers and pipelines notice nothing:
+
+```bash
+# Platform operator
+cf set-space-isolation-segment production-space high-density
+cf restart app-name
+
+# Developer/Pipeline - NO CHANGES NEEDED
+cf target -o production-org -s production-space
+cf push myapp  # Automatically deploys to isolation segment
+```
+
+Same space names, same routes, same URLs, same `cf push` commands. Zero coordination with development teams required.
+
 ## What's Included
 
 ### 📖 Documentation

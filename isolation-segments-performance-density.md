@@ -72,6 +72,33 @@ This guide includes two automation scripts for managing isolation segments:
 
 **Key Benefit:** Provides **compute isolation** (dedicated Diego cells) **without network isolation** (no routing infrastructure changes) = lowest-impact implementation.
 
+### Zero Impact to Developers and CI/CD Pipelines
+
+**Critical advantage:** Migration is completely transparent to developers and deployment pipelines.
+
+**How it works:**
+1. Platform operator assigns space to isolation segment: `cf set-space-isolation-segment production-space high-density`
+2. Platform operator restarts apps: `cf restart app-name`
+3. Apps now run on isolation segment - **developers and pipelines notice nothing**
+
+**What stays identical:**
+- Space names and org structure
+- `cf push` commands and workflows
+- CI/CD pipeline configurations (GitHub Actions, Jenkins, Concourse, etc.)
+- Application manifests and configuration
+- Routes, URLs, and DNS
+- Environment variables and service bindings
+
+**Example - Pipeline continues unchanged:**
+```bash
+# CI/CD pipeline script - NO CHANGES NEEDED
+cf target -o production-org -s production-space
+cf push myapp
+# App automatically deploys to isolation segment
+```
+
+This means you can migrate entire teams, business units, or workload types to optimized segments without coordinating with developers or updating hundreds of pipelines.
+
 ---
 
 ## Keep Existing Workloads Untouched
