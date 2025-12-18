@@ -45,7 +45,7 @@ This guide demonstrates how to leverage isolation segments to:
 
 - Direct BOSH deployment (bypasses tile management)
 - **NOT supported by Broadcom** - for testing only
-- Commands: `create-segment` (BOSH), `migrate`, `monitor`, `rollback`, `validate`
+- Commands: `create-segment`, `migrate`, `monitor`, `rollback`, `validate`
 - Faster for quick testing but lacks production support
 - Requires: BOSH Director access
 - Environment variables: `BOSH_ENVIRONMENT`, `BOSH_CLIENT`, `BOSH_CLIENT_SECRET`

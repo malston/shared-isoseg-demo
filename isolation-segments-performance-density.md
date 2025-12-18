@@ -48,7 +48,7 @@ This guide includes two automation scripts for managing isolation segments:
 - Uses direct BOSH deployment (bypasses Ops Manager)
 - NOT supported by Broadcom for production use
 - Faster for testing but lacks tile management features
-- Commands: `create-segment` (BOSH direct), `migrate`, `monitor`, `rollback`, `validate`
+- Commands: `create-segment`, `migrate`, `monitor`, `rollback`, `validate`
 - Requires: BOSH Director access
 
 **Example:**
