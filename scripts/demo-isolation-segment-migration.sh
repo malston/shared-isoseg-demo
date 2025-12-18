@@ -185,13 +185,13 @@ get_cell_capacity() {
         return
     fi
 
-    # Use cfdot on the Diego cell VM to query all cell states
+    # Use cfdot on the Diego cell VM to query cell state by cell_id
+    # The cell_id is the BOSH instance GUID, available in /var/vcap/instance/id
     # Source the cfdot setup script to get BBS_URL and cert paths
-    # Extract the cell state from BOSH SSH stdout, filtering by instance group
     local result
     result=$(bosh -d "$deployment" ssh "${instance_group}/${index}" \
-        -c "source /var/vcap/jobs/cfdot/bin/setup && cfdot cell-states" 2>&1 \
-        | grep ': stdout |' | sed 's/.*: stdout | //' | grep -E '^\{' | head -1)
+        -c "CELL_ID=\$(cat /var/vcap/instance/id) && source /var/vcap/jobs/cfdot/bin/setup && cfdot cell-state \$CELL_ID" 2>&1 \
+        | grep ': stdout |' | sed 's/.*: stdout | //' | tr -d '\n')
     echo "${result:-{}}"
 }
 
