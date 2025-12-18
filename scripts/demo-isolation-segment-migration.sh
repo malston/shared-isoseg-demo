@@ -727,6 +727,83 @@ display_comparison() {
 }
 
 #######################################
+# Cleanup Functions
+#######################################
+
+cleanup_demo() {
+    echo ""
+
+    local should_cleanup="$DEMO_CLEANUP"
+
+    # Ask user in interactive mode
+    if [[ "$DEMO_MODE" == "interactive" ]] && [[ "$DEMO_CLEANUP" == "ask" ]]; then
+        echo -n "Clean up demo environment? (y/n): "
+        read -r response
+        case "$response" in
+            [yY]|[yY][eE][sS])
+                should_cleanup="true"
+                ;;
+            *)
+                should_cleanup="false"
+                ;;
+        esac
+    fi
+
+    if [[ "$should_cleanup" != "true" ]]; then
+        info "Skipping cleanup. Demo environment preserved."
+        info "To clean up manually:"
+        info "  cf delete $DEMO_APP_NAME -f -r"
+        info "  cf delete-space $DEMO_SPACE -f"
+        info "  cf delete-org $DEMO_ORG -f"
+        echo ""
+        return 0
+    fi
+
+    info "Cleaning up demo environment..."
+
+    # Delete app
+    if cf app "$DEMO_APP_NAME" &> /dev/null; then
+        info "Deleting app: $DEMO_APP_NAME"
+        cf delete "$DEMO_APP_NAME" -f -r
+        success "App deleted"
+    fi
+
+    # Reset space isolation segment
+    info "Resetting space isolation segment..."
+    cf reset-space-isolation-segment "$DEMO_SPACE" &> /dev/null || true
+
+    # Delete space
+    if cf space "$DEMO_SPACE" &> /dev/null; then
+        info "Deleting space: $DEMO_SPACE"
+        cf delete-space "$DEMO_SPACE" -f
+        success "Space deleted"
+    fi
+
+    # Delete org
+    if cf org "$DEMO_ORG" &> /dev/null; then
+        info "Deleting org: $DEMO_ORG"
+        cf delete-org "$DEMO_ORG" -f
+        success "Org deleted"
+    fi
+
+    # Optionally delete isolation segment
+    if [[ "$DEMO_CLEANUP" == "full" ]]; then
+        if cf isolation-segments | grep -q "^${DEMO_SEGMENT}$"; then
+            info "Deleting isolation segment: $DEMO_SEGMENT"
+            cf delete-isolation-segment "$DEMO_SEGMENT" -f || warn "Could not delete segment (may be in use)"
+        fi
+    fi
+
+    # Clean up temp files
+    if [[ -f "$STATE_FILE" ]]; then
+        rm -f "$STATE_FILE"
+    fi
+
+    success "Cleanup completed"
+    echo ""
+}
+
+#######################################
 # Main
 #######################################
 
@@ -783,6 +860,16 @@ main() {
 
     # Display comparison
     display_comparison
+
+    # Cleanup
+    cleanup_demo
+
+    # Final message
+    if [[ "$DEMO_MODE" == "interactive" ]]; then
+        echo -e "${GREEN}${BOLD}Demo complete!${NC}"
+    else
+        log "Demo completed successfully"
+    fi
 }
 
 # Run main if script is executed directly
