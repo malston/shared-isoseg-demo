@@ -445,7 +445,7 @@ deploy_app_before_isolation() {
 
     # Push app (no isolation segment assigned yet)
     info "Deploying app..."
-    if cf push "$DEMO_APP_NAME" -p "$app_jar" -b java_buildpack --no-start; then
+    if cf push "$DEMO_APP_NAME" -p "$app_jar" -b java_buildpack_offline --no-start; then
         success "App pushed successfully"
     else
         fatal "Failed to push app"
