@@ -475,6 +475,56 @@ deploy_app_before_isolation() {
 }
 
 #######################################
+# Migration Functions
+#######################################
+
+enable_isolation_segment() {
+    phase_header "Phase 3" "Enable Isolation Segment"
+
+    # Entitle org to segment
+    info "Entitling org '$DEMO_ORG' to segment '$DEMO_SEGMENT'..."
+    if cf enable-org-isolation "$DEMO_ORG" "$DEMO_SEGMENT"; then
+        success "Org entitled"
+    else
+        error "Failed to entitle org (may already be entitled)"
+    fi
+
+    # Assign space to segment
+    info "Assigning space '$DEMO_SPACE' to segment '$DEMO_SEGMENT'..."
+    if cf set-space-isolation-segment "$DEMO_SPACE" "$DEMO_SEGMENT"; then
+        success "Space assigned"
+    else
+        fatal "Failed to assign space to isolation segment"
+    fi
+
+    # Restart app to trigger migration
+    info "Restarting app to trigger migration..."
+    if cf restart "$DEMO_APP_NAME"; then
+        success "App restarted successfully"
+    else
+        error "App restart failed. Attempting rollback..."
+        cf reset-space-isolation-segment "$DEMO_SPACE"
+        fatal "Migration failed. Space isolation segment reset."
+    fi
+
+    # Wait for app to stabilize
+    info "Waiting for app to stabilize..."
+    sleep 5
+
+    # Verify app is still accessible
+    local app_state
+    app_state=$(cf app "$DEMO_APP_NAME" | grep "^state:" | awk '{print $2}')
+
+    if [[ "$app_state" != "started" ]]; then
+        error "App is not in started state: $app_state"
+        fatal "Migration verification failed"
+    fi
+
+    success "App is running on isolated Diego cells"
+    echo ""
+}
+
+#######################################
 # Main
 #######################################
 
@@ -515,6 +565,11 @@ main() {
     display_before_state
 
     pause_for_demo "enable isolation segment and restart app"
+
+    # Enable isolation segment
+    enable_isolation_segment
+
+    pause_for_demo "see AFTER state"
 }
 
 # Run main if script is executed directly
