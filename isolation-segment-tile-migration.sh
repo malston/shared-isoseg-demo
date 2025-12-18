@@ -352,29 +352,29 @@ install_tile() {
 
     if [[ -z "$available_versions" ]]; then
         warn "Could not query available product versions"
-        info "Manually stage the tile: om stage-product --product-name isolation-segment --product-version VERSION"
+        info "Manually stage the tile: om stage-product --product-name p-isolation-segment --product-version VERSION"
         info "Or use Ops Manager UI: Installation Dashboard → isolation-segment → Stage"
         return 0
     fi
 
-    # Find the most recent isolation-segment version (likely the one just uploaded)
+    # Find the most recent p-isolation-segment version (likely the one just uploaded)
     local tile_version
-    tile_version=$(echo "$available_versions" | jq -r '.[] | select(.name == "isolation-segment") | .version' | head -1)
+    tile_version=$(echo "$available_versions" | jq -r '.[] | select(.name == "p-isolation-segment") | .version' | head -1)
 
     if [[ -z "$tile_version" ]]; then
-        warn "Could not find isolation-segment in available products"
-        info "Manually stage the tile: om stage-product --product-name isolation-segment --product-version VERSION"
+        warn "Could not find p-isolation-segment in available products"
+        info "Manually stage the tile: om stage-product --product-name p-isolation-segment --product-version VERSION"
         return 0
     fi
 
     info "Staging tile version $tile_version..."
-    if om stage-product --product-name isolation-segment --product-version "$tile_version"; then
+    if om stage-product --product-name p-isolation-segment --product-version "$tile_version"; then
         success "Tile staged successfully"
     else
         error "Failed to stage tile version $tile_version"
         info "Try staging manually via Ops Manager UI or:"
         info "  om available-products  # to see all versions"
-        info "  om stage-product --product-name isolation-segment --product-version VERSION"
+        info "  om stage-product --product-name p-isolation-segment --product-version VERSION"
         return 1
     fi
 
@@ -481,7 +481,7 @@ configure_segment() {
     warn ""
     warn "Then apply changes:"
     warn "  Via UI: Review Pending Changes → Apply Changes"
-    warn "  Via CLI: om apply-changes --product-name isolation-segment"
+    warn "  Via CLI: om apply-changes --product-name p-isolation-segment"
     warn ""
 
     info "After deployment completes, register the segment:"
