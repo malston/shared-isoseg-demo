@@ -84,7 +84,7 @@ Usage: $0 [OPTIONS] COMMAND [ARGS]
 Comprehensive isolation segment migration tool for Cloud Foundry / TAS / EAR.
 
 COMMANDS:
-    create-segment      Create and configure a new isolation segment
+    create-segment     Create and configure a new isolation segment
     migrate            Migrate apps to isolation segment in batches
     monitor            Monitor segment capacity and performance
     rollback           Rollback app migrations to previous segment
@@ -215,12 +215,12 @@ Usage: $0 create-segment [OPTIONS]
 Create and configure a new isolation segment with BOSH deployment.
 
 OPTIONS:
-    --name NAME              Segment name (required)
-    --cell-size SIZE         Diego cell size: 4/32, 8/64, 4/128, 8/32 (required)
-    --count COUNT            Number of Diego cells to deploy (required)
-    --deployment NAME        BOSH deployment name (default: same as segment name)
+    --name NAME             Segment name (required)
+    --cell-size SIZE        Diego cell size: 4/32, 8/64, 4/128, 8/32 (required)
+    --count COUNT           Number of Diego cells to deploy (required)
+    --deployment NAME       BOSH deployment name (default: same as segment name)
     --az AZ1,AZ2,AZ3        Availability zones (comma-separated)
-    --network NETWORK        BOSH network name (default: default)
+    --network NETWORK       BOSH network name (default: default)
     --vm-type TYPE          VM type for Diego cells (default: auto-calculated from cell-size)
     --register              Register segment in Cloud Controller after creation
     -h, --help              Show this help message
