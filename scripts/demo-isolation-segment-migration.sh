@@ -719,32 +719,32 @@ display_comparison() {
 
     if [[ "$DEMO_MODE" == "interactive" ]]; then
         # Pretty table format
-        echo "┌─────────────────────────┬──────────────────────┬─────────────────────┐"
-        echo "│ Attribute               │ BEFORE               │ AFTER               │"
-        echo "├─────────────────────────┼──────────────────────┼─────────────────────┤"
+        echo "┌─────────────────────────┬──────────────────────┬────────────────────────┐"
+        echo "│ Attribute               │ BEFORE               │ AFTER                  │"
+        echo "├─────────────────────────┼──────────────────────┼────────────────────────┤"
 
-        printf "│ %-23s │ %-20s │ ${GREEN}%-19s${NC} │\n" \
+        printf "│ %-23s │ %-20s │ ${GREEN}%-23s${NC} │\n" \
             "Isolation Segment" \
             "$(echo "$before" | jq -r '.cf_cli.isolation_segment // "(not set)"')" \
             "$(echo "$after" | jq -r '.cf_cli.isolation_segment') ✨"
 
         if [[ "$DEMO_SKIP_BOSH" != "true" ]]; then
-            printf "│ %-23s │ %-20s │ ${GREEN}%-19s${NC} │\n" \
+            printf "│ %-23s │ %-20s │ ${GREEN}%-23s${NC} │\n" \
                 "BOSH Deployment" \
                 "$(echo "$before" | jq -r '.bosh.tas_deployment' | cut -c1-17)..." \
                 "$(echo "$after" | jq -r '.bosh.iso_deployment' | cut -c1-14)... ✨"
 
-            printf "│ %-23s │ %-20s │ ${GREEN}%-19s${NC} │\n" \
+            printf "│ %-23s │ %-20s │ ${GREEN}%-23s${NC} │\n" \
                 "Instance Group" \
                 "$(echo "$before" | jq -r '.bosh.instance_group')/0" \
                 "$(echo "$after" | jq -r '.bosh.instance_group' | cut -c1-15)... ✨"
 
-            printf "│ %-23s │ %-20s │ ${GREEN}%-19s${NC} │\n" \
+            printf "│ %-23s │ %-20s │ ${GREEN}%-23s${NC} │\n" \
                 "Cell IP" \
                 "$(echo "$before" | jq -r '.bosh.cell_ip')" \
                 "$(echo "$after" | jq -r '.bosh.cell_ip') ✨"
 
-            printf "│ %-23s │ %-20s │ ${GREEN}%-19s${NC} │\n" \
+            printf "│ %-23s │ %-20s │ ${GREEN}%-23s${NC} │\n" \
                 "Placement Tags" \
                 "none" \
                 "$(echo "$after" | jq -r '.bosh.placement_tags[0]') ✨"
@@ -753,22 +753,22 @@ display_comparison() {
         local app_url
         app_url=$(cf app "$DEMO_APP_NAME" | grep "routes:" | awk '{print $2}' | cut -c1-17)
 
-        printf "│ %-23s │ %-20s │ %-19s │\n" \
+        printf "│ %-23s │ %-20s │ %-22s │\n" \
             "App URL" \
             "${app_url}..." \
             "${app_url}..."
 
-        printf "│ %-23s │ %-20s │ ${GREEN}%-19s${NC} │\n" \
+        printf "│ %-23s │ %-20s │ ${GREEN}%-23s${NC} │\n" \
             "App Code Changed?" \
             "-" \
             "NO ✅"
 
-        printf "│ %-23s │ %-20s │ ${GREEN}%-19s${NC} │\n" \
+        printf "│ %-23s │ %-20s │ ${GREEN}%-23s${NC} │\n" \
             "Developer Impact?" \
             "-" \
             "ZERO ✅"
 
-        echo "└─────────────────────────┴──────────────────────┴─────────────────────┘"
+        echo "└─────────────────────────┴──────────────────────┴────────────────────────┘"
         echo ""
 
         echo -e "${BOLD}KEY TAKEAWAY:${NC} Same app, same URL, zero code changes - just better"
