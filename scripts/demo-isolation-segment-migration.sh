@@ -168,7 +168,7 @@ validate_prerequisites() {
     fi
 
     local cf_api
-    cf_api=$(cf api | grep "API endpoint:" | awk '{print $3}')
+    cf_api=$(cf api | grep "API endpoint:" | sed 's/^API endpoint:[[:space:]]*//')
     success "Connected to CF API: $cf_api"
 
     # Validate BOSH connection if not skipped
