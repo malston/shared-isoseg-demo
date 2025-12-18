@@ -288,11 +288,22 @@ display_before_state() {
         echo "   Cell Type:          Shared $(echo "$before" | jq -r '.bosh.instance_group | ascii_upcase') Cell"
         local containers_used
         local containers_total
+        local containers_available
         containers_total=$(echo "$before" | jq -r '.capacity.shared_cell.containers_total // 0')
         containers_available=$(echo "$before" | jq -r '.capacity.shared_cell.containers_available // 0')
-        containers_used=$((containers_total - containers_available))
-        echo "   Containers Used:    $containers_used"
-        echo "   Available:          $containers_available"
+
+        # If BOSH data is unavailable (0/0), use CF app instance count
+        if [[ "$containers_total" -eq 0 ]] && [[ "$containers_available" -eq 0 ]]; then
+            local app_instances
+            app_instances=$(cf app "$DEMO_APP_NAME" | grep "^instances:" | head -1 | awk '{print $2}' | cut -d'/' -f1)
+            containers_used="${app_instances:-1}"
+            echo "   Containers Used:    $containers_used (app running here)"
+            echo "   Available:          N/A (BOSH metrics unavailable)"
+        else
+            containers_used=$((containers_total - containers_available))
+            echo "   Containers Used:    $containers_used"
+            echo "   Available:          $containers_available"
+        fi
         echo ""
     fi
 
