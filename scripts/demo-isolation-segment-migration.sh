@@ -435,12 +435,18 @@ deploy_app_before_isolation() {
         cf delete "$DEMO_APP_NAME" -f -r
     fi
 
-    # Download spring-music if needed
-    local app_jar="/tmp/spring-music.jar"
+    # Use local spring-music JAR or download if needed
+    local app_jar="$HOME/spring-music/build/libs/spring-music-1.0.jar"
+
     if [[ ! -f "$app_jar" ]]; then
-        info "Downloading Spring Music sample app..."
-        curl -L -o "$app_jar" "https://github.com/cloudfoundry-samples/spring-music/releases/download/v1.0/spring-music.jar"
-        success "Downloaded Spring Music to $app_jar"
+        warn "Spring Music JAR not found at $app_jar"
+        info "Building Spring Music from source..."
+        if [[ -d "$HOME/spring-music" ]]; then
+            (cd "$HOME/spring-music" && ./gradlew clean build -x test)
+            success "Built Spring Music at $app_jar"
+        else
+            fatal "Spring Music repository not found at $HOME/spring-music. Please clone: git clone https://github.com/cloudfoundry-samples/spring-music ~/spring-music"
+        fi
     fi
 
     # Push app (no isolation segment assigned yet)
