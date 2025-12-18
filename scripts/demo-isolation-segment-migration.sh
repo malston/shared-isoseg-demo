@@ -185,8 +185,13 @@ get_cell_capacity() {
         return
     fi
 
-    bosh -d "$deployment" ssh "${instance_group}/${index}" \
-        -c "curl -s localhost:1800/state" 2>/dev/null || echo "{}"
+    # Try to query the rep API on the Diego cell VM
+    # Note: BOSH SSH may not be available in all environments
+    # The display logic will fall back to CF CLI instance count if this returns {}
+    local result
+    result=$(bosh -d "$deployment" ssh "${instance_group}/${index}" \
+        -c "curl -sk https://localhost:1800/state" 2>/dev/null | grep -v "^${instance_group}" | grep -v "^Running SSH" | grep -E '^\{')
+    echo "${result:-{}}"
 }
 
 get_app_cell_ip() {
@@ -206,7 +211,7 @@ capture_before_state() {
 
     # Method 1: CF CLI verification
     local cf_isolation_segment
-    cf_isolation_segment=$(cf app "$DEMO_APP_NAME" | grep "isolation segment:" | awk '{print $3}' || echo "(not set)")
+    cf_isolation_segment=$(cf app "$DEMO_APP_NAME" | grep "isolation segment:" | head -1 | awk '{print $3}' || echo "(not set)")
 
     # Method 2: BOSH physical placement
     local tas_deployment
@@ -560,7 +565,7 @@ capture_after_state() {
 
     # Method 1: CF CLI verification
     local cf_isolation_segment
-    cf_isolation_segment=$(cf app "$DEMO_APP_NAME" | grep "isolation segment:" | awk '{print $3}' || echo "(not set)")
+    cf_isolation_segment=$(cf app "$DEMO_APP_NAME" | grep "isolation segment:" | head -1 | awk '{print $3}' || echo "(not set)")
 
     # Method 2: BOSH physical placement
     local tas_deployment
@@ -614,9 +619,27 @@ capture_after_state() {
 EOF
     )
 
-    # Merge with existing state file
+    # Write after_state to temp file for validation
+    local temp_after_file
+    temp_after_file=$(mktemp)
+    echo "$after_state" > "$temp_after_file"
+
+    # Validate the JSON
+    if ! jq empty "$temp_after_file" 2>/dev/null; then
+        error "Generated invalid JSON for AFTER state:"
+        cat "$temp_after_file"
+        rm -f "$temp_after_file"
+        fatal "AFTER state JSON validation failed"
+    fi
+
+    # Merge with existing state file (or create new if doesn't exist)
     local merged_state
-    merged_state=$(jq --argjson after "$after_state" '. + {"after": $after}' "$STATE_FILE")
+    if [[ -f "$STATE_FILE" ]]; then
+        merged_state=$(jq --slurpfile after "$temp_after_file" '. + {"after": $after[0]}' "$STATE_FILE")
+    else
+        merged_state=$(jq --slurpfile after "$temp_after_file" '{"after": $after[0]}' <<< '{}')
+    fi
+    rm -f "$temp_after_file"
     echo "$merged_state" > "$STATE_FILE"
 
     success "AFTER state captured"
@@ -666,9 +689,19 @@ display_after_state() {
         local isolated_containers_used
         isolated_containers_total=$(echo "$after" | jq -r '.capacity.isolated_cell.containers_total // 0')
         isolated_containers_available=$(echo "$after" | jq -r '.capacity.isolated_cell.containers_available // 0')
-        isolated_containers_used=$((isolated_containers_total - isolated_containers_available))
-        echo -e "     Containers Used:  ${GREEN}$isolated_containers_used (our app is here)${NC} ✨"
-        echo "     Available:        $isolated_containers_available"
+
+        # If BOSH data is unavailable (0/0), use CF app instance count
+        if [[ "$isolated_containers_total" -eq 0 ]] && [[ "$isolated_containers_available" -eq 0 ]]; then
+            local app_instances
+            app_instances=$(cf app "$DEMO_APP_NAME" | grep "^instances:" | head -1 | awk '{print $2}' | cut -d'/' -f1)
+            isolated_containers_used="${app_instances:-1}"
+            echo -e "     Containers Used:  ${GREEN}$isolated_containers_used (our app is here)${NC} ✨"
+            echo "     Available:        N/A (BOSH metrics unavailable)"
+        else
+            isolated_containers_used=$((isolated_containers_total - isolated_containers_available))
+            echo -e "     Containers Used:  ${GREEN}$isolated_containers_used (our app is here)${NC} ✨"
+            echo "     Available:        $isolated_containers_available"
+        fi
         echo ""
     fi
 
