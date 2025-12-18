@@ -1,0 +1,18 @@
+# Logs
+logs/
+
+# Secrets
+**/secrets/
+*.pem
+*.key
+!*.key.example
+.envrc
+.env
+
+# OS files
+.DS_Store
+
+# Editor
+.idea/
+*.swp
+*.swo
