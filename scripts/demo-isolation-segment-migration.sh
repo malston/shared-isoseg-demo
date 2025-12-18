@@ -804,10 +804,130 @@ cleanup_demo() {
 }
 
 #######################################
+# Usage and Help
+#######################################
+
+usage() {
+    cat <<EOF
+Usage: $0 [OPTIONS]
+
+Interactive demo script showing zero-impact migration from shared Diego cells
+to isolated Diego cells in Cloud Foundry.
+
+OPTIONS:
+  --automated              Run in automated mode (no pauses)
+  --interactive            Run in interactive mode with pauses (default)
+  --segment NAME           Isolation segment name (default: $DEMO_SEGMENT)
+  --org NAME               Org name (default: $DEMO_ORG)
+  --space NAME             Space name (default: $DEMO_SPACE)
+  --app NAME               App name (default: $DEMO_APP_NAME)
+  --cleanup                Cleanup at end without asking
+  --no-cleanup             Skip cleanup at end
+  --skip-bosh              Skip BOSH verification (CF CLI only)
+  --verbose                Enable verbose output
+  -h, --help               Show this help message
+  -v, --version            Show version
+
+ENVIRONMENT VARIABLES:
+  DEMO_MODE                Operating mode: 'interactive' or 'automated'
+  DEMO_SEGMENT             Isolation segment name
+  DEMO_ORG                 Org name
+  DEMO_SPACE               Space name
+  DEMO_APP_NAME            App name
+  DEMO_CLEANUP             Cleanup mode: 'ask', 'true', 'false', 'full'
+  DEMO_SKIP_BOSH           Skip BOSH verification: 'true' or 'false'
+  VERBOSE                  Enable debug logging: 'true' or 'false'
+
+EXAMPLES:
+  # Interactive mode (default)
+  $0
+
+  # Automated mode with cleanup
+  $0 --automated --cleanup
+
+  # Custom segment and org
+  $0 --segment high-density --org prod-demo --space demo
+
+  # Skip BOSH verification
+  $0 --skip-bosh
+
+  # Environment variables
+  DEMO_MODE=automated DEMO_CLEANUP=true $0
+
+For more information, see: docs/plans/2025-12-18-demo-script-implementation.md
+
+EOF
+}
+
+version() {
+    echo "$0 version $VERSION"
+}
+
+#######################################
 # Main
 #######################################
 
 main() {
+    # Parse command-line arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --automated)
+                DEMO_MODE="automated"
+                shift
+                ;;
+            --interactive)
+                DEMO_MODE="interactive"
+                shift
+                ;;
+            --segment)
+                DEMO_SEGMENT="$2"
+                shift 2
+                ;;
+            --org)
+                DEMO_ORG="$2"
+                shift 2
+                ;;
+            --space)
+                DEMO_SPACE="$2"
+                shift 2
+                ;;
+            --app)
+                DEMO_APP_NAME="$2"
+                shift 2
+                ;;
+            --cleanup)
+                DEMO_CLEANUP="true"
+                shift
+                ;;
+            --no-cleanup)
+                DEMO_CLEANUP="false"
+                shift
+                ;;
+            --skip-bosh)
+                DEMO_SKIP_BOSH="true"
+                shift
+                ;;
+            --verbose)
+                VERBOSE="true"
+                shift
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            -v|--version)
+                version
+                exit 0
+                ;;
+            *)
+                error "Unknown option: $1"
+                usage
+                exit 1
+                ;;
+        esac
+    done
+
+    # Rest of main function
     # Show banner
     if [[ "$DEMO_MODE" == "interactive" ]]; then
         section_header "Isolation Segment Migration Demo"
