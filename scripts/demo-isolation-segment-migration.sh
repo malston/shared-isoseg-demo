@@ -468,14 +468,15 @@ deploy_app_before_isolation() {
     # Push app (no isolation segment assigned yet)
     info "Deploying app..."
 
-    # Set Java version to 17 (Spring Music requires Java 17)
-    cf set-env "$DEMO_APP_NAME" JBP_CONFIG_OPEN_JDK_JRE '{ jre: { version: 17.+ } }' &> /dev/null || true
-
     if cf push "$DEMO_APP_NAME" -p "$app_jar" -b java_buildpack_offline -s cflinuxfs4 --no-start; then
         success "App pushed successfully"
     else
         fatal "Failed to push app"
     fi
+
+    # Set Java version to 17 (Spring Music requires Java 17)
+    info "Configuring Java 17 runtime..."
+    cf set-env "$DEMO_APP_NAME" JBP_CONFIG_OPEN_JDK_JRE '{ jre: { version: 17.+ } }'
 
     # Start app
     info "Starting app..."
