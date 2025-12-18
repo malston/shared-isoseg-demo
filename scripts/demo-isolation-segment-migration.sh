@@ -262,6 +262,56 @@ setup_demo_environment() {
     echo ""
 }
 
+deploy_app_before_isolation() {
+    phase_header "Phase 2" "Deploy App (BEFORE Isolation Segment)"
+
+    info "Pushing $DEMO_APP_NAME app to shared Diego cells..."
+
+    # Check if app already exists
+    if cf app "$DEMO_APP_NAME" &> /dev/null; then
+        warn "App $DEMO_APP_NAME already exists. Deleting it first..."
+        cf delete "$DEMO_APP_NAME" -f -r
+    fi
+
+    # Download spring-music if needed
+    local app_jar="/tmp/spring-music.jar"
+    if [[ ! -f "$app_jar" ]]; then
+        info "Downloading Spring Music sample app..."
+        curl -L -o "$app_jar" "https://github.com/cloudfoundry-samples/spring-music/releases/download/v1.0/spring-music.jar"
+        success "Downloaded Spring Music to $app_jar"
+    fi
+
+    # Push app (no isolation segment assigned yet)
+    info "Deploying app..."
+    if cf push "$DEMO_APP_NAME" -p "$app_jar" -b java_buildpack --no-start; then
+        success "App pushed successfully"
+    else
+        fatal "Failed to push app"
+    fi
+
+    # Start app
+    info "Starting app..."
+    if cf start "$DEMO_APP_NAME"; then
+        success "App started successfully"
+    else
+        fatal "Failed to start app"
+    fi
+
+    # Get app URL
+    local app_url
+    app_url=$(cf app "$DEMO_APP_NAME" | grep "routes:" | awk '{print $2}')
+
+    if [[ -n "$app_url" ]]; then
+        success "App is running at: https://$app_url"
+    fi
+
+    # Wait for app to be fully ready
+    info "Waiting for app to be fully ready..."
+    sleep 5
+
+    echo ""
+}
+
 #######################################
 # Main
 #######################################
@@ -290,6 +340,11 @@ main() {
     setup_demo_environment
 
     pause_for_demo "continue to app deployment"
+
+    # Deploy app before isolation segment
+    deploy_app_before_isolation
+
+    pause_for_demo "see BEFORE state"
 }
 
 # Run main if script is executed directly
