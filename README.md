@@ -62,9 +62,9 @@ Same space names, same routes, same URLs, same `cf push` commands. Zero coordina
 
 - Official Isolation Segment tile installation via Ops Manager
 - **SUPPORTED by Broadcom** for production use
-- Commands: `install-tile`, `configure-segment`, `register-segment`
-- Requires: `om` CLI and Ops Manager credentials
-- Environment variables: `OM_TARGET`, `OM_USERNAME`, `OM_PASSWORD`
+- Commands: `download-tile`, `download-replicator`, `replicate-tile`, `configure-segment`, `register-segment`
+- Requires: `om` CLI, `pivnet` CLI, and Ops Manager credentials
+- Environment variables: `OM_TARGET`, `OM_USERNAME`, `OM_PASSWORD`, `PIVNET_API_TOKEN`
 
 #### isolation-segment-migration.sh (TESTING ONLY)
 
@@ -76,6 +76,41 @@ Same space names, same routes, same URLs, same `cf push` commands. Zero coordina
 - Faster for quick testing but lacks production support
 - Requires: BOSH Director access
 - Environment variables: `BOSH_ENVIRONMENT`, `BOSH_CLIENT`, `BOSH_CLIENT_SECRET`
+
+#### demo-isolation-segment-migration.sh (Demonstrations)
+
+**[demo-isolation-segment-migration.sh](./scripts/demo-isolation-segment-migration.sh)** - **For demos and presentations**
+
+- Interactive demonstration of zero-impact workload migration
+- **Single-segment mode:** Migrate one app from shared cells to an isolation segment
+- **Dual-segment mode:** Deploy two apps to two different segments for side-by-side comparison
+- Includes before/after state capture and comparison display
+- Auto-cleanup option for repeatable demos
+
+```bash
+# Single-segment demo (default)
+./scripts/demo-isolation-segment-migration.sh --interactive
+
+# Dual-segment demo (two apps, two segments)
+./scripts/demo-isolation-segment-migration.sh --dual-segment --automated --cleanup
+```
+
+### 📁 Configuration Files
+
+**[config/isolation-segment/](./config/isolation-segment/)** - Pre-configured vars files for different cell sizes
+
+- `small-cell-vars.yml` - 3 Diego cells, medium.disk instance type
+- `medium-cell-vars.yml` - 5 Diego cells, medium.disk instance type
+- `large-cell-vars.yml` - 10 Diego cells, automatic instance type
+- `secrets/ssl-certs.yml` - SSL certificate/key values (gitignored)
+
+### 📱 Demo Applications
+
+**[apps/cf-env/](./apps/cf-env/)** - Lightweight Go app for dual-segment demos
+
+- Displays CF environment variables (CF_INSTANCE_IP, etc.)
+- 64MB memory footprint
+- Used to demonstrate workload differentiation between segments
 
 ## Quick Start
 
@@ -121,14 +156,16 @@ cf target
 om upload-product --product small-cell-10.2.5.pivotal
 om stage-product --product-name p-isolation-segment-small-cell --product-version 10.2.5
 
-# Configure (see workflow guide for config file examples)
-om configure-product --config config/isolation-segment/small-cell-config.yml
+# Configure using the migration script (auto-detects secrets)
+./scripts/isolation-segment-tile-migration.sh configure-segment \
+    --product p-isolation-segment-small-cell \
+    --vars-file config/isolation-segment/small-cell-vars.yml
 
 # Apply changes in Ops Manager
 om apply-changes --product-name p-isolation-segment-small-cell
 
 # Register segment in Cloud Controller
-cf create-isolation-segment small-cell
+./scripts/isolation-segment-tile-migration.sh register-segment --name small-cell
 ```
 
 **Testing only (BOSH direct - NOT SUPPORTED):**
@@ -167,13 +204,13 @@ cf create-isolation-segment small-cell
 
 ```bash
 # One-time capacity check
-./scripts/isolation-segment-migration.sh monitor --segment high-density
+./scripts/isolation-segment-migration.sh monitor --segment large-cell
 
 # Real-time monitoring (refresh every 10 seconds)
-./scripts/isolation-segment-migration.sh monitor --segment high-density --watch 10
+./scripts/isolation-segment-migration.sh monitor --segment large-cell --watch 10
 
 # Export metrics as JSON
-./scripts/isolation-segment-migration.sh monitor --segment high-density --output json
+./scripts/isolation-segment-migration.sh monitor --segment large-cell --output json
 ```
 
 ### 6. Rollback if Needed
