@@ -35,7 +35,7 @@ Same space names, same routes, same URLs, same `cf push` commands. Zero coordina
 
 ### 📖 Documentation
 
-**[isolation-segments-performance-density.md](./isolation-segments-performance-density.md)**
+**[isolation-segments-performance-density.md](./docs/isolation-segments-performance-density.md)**
 
 - Comprehensive implementation guide
 - Segment strategy examples (large-cell, high-performance, high-memory, high-CPU)
@@ -46,7 +46,7 @@ Same space names, same routes, same URLs, same `cf push` commands. Zero coordina
 - Rollback procedures
 - Complete implementation roadmap
 
-**[isolation-segment-deployment-workflow.md](./isolation-segment-deployment-workflow.md)**
+**[isolation-segment-deployment-workflow.md](.docs/isolation-segment-deployment-workflow.md)**
 
 - Step-by-step deployment workflow for multiple isolation segments
 - Replicator tool usage and tile replication
@@ -140,7 +140,7 @@ cf target
 
 ### 3. Create an Isolation Segment
 
-**For detailed workflow, see [isolation-segment-deployment-workflow.md](./isolation-segment-deployment-workflow.md)**
+**For detailed workflow, see [isolation-segment-deployment-workflow.md](.docs/isolation-segment-deployment-workflow.md)**
 
 **Production (Tile-based - SUPPORTED):**
 

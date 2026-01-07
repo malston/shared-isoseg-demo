@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "MAX_MCP_OUTPUT_TOKENS": "60000",
+    "BASH_DEFAULT_TIMEOUT_MS": "300000",
+    "BASH_MAX_TIMEOUT_MS": "600000",
+    "MAX_THINKING_TOKENS": "8192",
+    "ENABLE_EXPERIMENTAL_MCP_CLI": "true"
+  },
+  "includeCoAuthoredBy": false,
+  "dangerously_skip_permissions": false,
+  "verbose": false,
+  "enabledPlugins": {
+    "backend-api-security@claude-code-workflows": true,
+    "backend-development@claude-code-workflows": true,
+    "claude-mem@thedotmack": true,
+    "code-documentation@claude-code-workflows": true,
+    "code-refactoring@claude-code-workflows": true,
+    "code-review-ai@claude-code-workflows": true,
+    "codebase-cleanup@claude-code-workflows": true,
+    "commit-commands@claude-code-plugins": true,
+    "comprehensive-review@claude-code-workflows": true,
+    "debugging-toolkit@claude-code-workflows": true,
+    "dependency-management@claude-code-workflows": true,
+    "developer-essentials@claude-code-workflows": true,
+    "documentation-generation@claude-code-workflows": true,
+    "elements-of-style@superpowers-marketplace": true,
+    "error-debugging@claude-code-workflows": true,
+    "frontend-design@claude-plugins-official": true,
+    "full-stack-orchestration@claude-code-workflows": true,
+    "git-pr-workflows@claude-code-workflows": true,
+    "javascript-typescript@claude-code-workflows": true,
+    "performance-testing-review@claude-code-workflows": true,
+    "security-compliance@claude-code-workflows": true,
+    "security-scanning@claude-code-workflows": true,
+    "shell-scripting@claude-code-workflows": true,
+    "superpowers@superpowers-marketplace": true,
+    "tdd-workflows@claude-code-workflows": true,
+    "unit-testing@claude-code-workflows": true
+  }
+}
