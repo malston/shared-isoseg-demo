@@ -792,13 +792,19 @@ OPTIONS:
                         - For replicated tiles: small-cell, medium-cell, etc.
     --vars-file PATH     Path to vars file (required)
                         - Pre-configured files in config/isolation-segment/
+    --secrets-file PATH  Path to secrets vars file (optional)
+                        - Contains SSL certificates/keys
+                        - Auto-detected from config-dir/secrets/ssl-certs.yml
     --config-dir PATH    Config template directory (default: config/isolation-segment)
     --apply              Apply changes after configuration (optional)
     -h, --help           Show this help message
 
 EXAMPLES:
-    # Configure using pre-made vars file
+    # Configure using pre-made vars file (secrets auto-detected)
     $0 configure-segment --product p-isolation-segment-small-cell --vars-file config/isolation-segment/small-cell-vars.yml
+
+    # Configure with explicit secrets file
+    $0 configure-segment --product p-isolation-segment-small-cell --vars-file config/isolation-segment/small-cell-vars.yml --secrets-file /path/to/secrets.yml
 
     # Configure and apply changes
     $0 configure-segment --product p-isolation-segment-medium-cell --vars-file config/isolation-segment/medium-cell-vars.yml --apply
@@ -811,6 +817,16 @@ PRE-CONFIGURED VARS FILES:
     config/isolation-segment/medium-cell-vars.yml  - 5 diego cells
     config/isolation-segment/large-cell-vars.yml   - 10 diego cells
 
+SECRETS FILE:
+    The script auto-detects secrets from config-dir/secrets/ssl-certs.yml.
+    This file should contain SSL certificate/key values:
+      networking_poe_ssl_certs_0_certificate: |
+        -----BEGIN CERTIFICATE-----
+        ...
+      networking_poe_ssl_certs_0_privatekey: |
+        -----BEGIN RSA PRIVATE KEY-----
+        ...
+
 GENERATE VARS FILE:
     # Export existing tile config as starting point
     om staged-config -p p-isolation-segment -c > base-config.yml
@@ -821,6 +837,7 @@ EOF
 configure_segment() {
     local product_name=""
     local vars_file=""
+    local secrets_file=""
     local config_dir=""
     local apply_changes=false
 
@@ -838,6 +855,10 @@ configure_segment() {
                 ;;
             --vars-file)
                 vars_file="$2"
+                shift 2
+                ;;
+            --secrets-file)
+                secrets_file="$2"
                 shift 2
                 ;;
             --config-dir)
@@ -874,9 +895,24 @@ configure_segment() {
     [[ ! -f "$product_yml" ]] && fatal "Product template not found: $product_yml"
     [[ ! -f "$default_vars" ]] && fatal "Default vars not found: $default_vars"
 
+    # Auto-detect secrets file if not specified
+    if [[ -z "$secrets_file" ]]; then
+        local default_secrets="${config_dir}/secrets/ssl-certs.yml"
+        if [[ -f "$default_secrets" ]]; then
+            secrets_file="$default_secrets"
+            debug "Auto-detected secrets file: $secrets_file"
+        fi
+    fi
+
+    # Validate secrets file if specified
+    if [[ -n "$secrets_file" && ! -f "$secrets_file" ]]; then
+        fatal "Secrets file not found: $secrets_file"
+    fi
+
     info "Configuring Isolation Segment tile"
     info "  Product: $product_name"
     info "  Vars file: $vars_file"
+    [[ -n "$secrets_file" ]] && info "  Secrets file: $secrets_file"
     info "  Config dir: $config_dir"
 
     if [[ "$DRY_RUN" == "true" ]]; then
@@ -886,6 +922,7 @@ configure_segment() {
         info "    --config $product_yml \\"
         info "    --vars-file $default_vars \\"
         info "    --vars-file $vars_file \\"
+        [[ -n "$secrets_file" ]] && info "    --vars-file $secrets_file \\"
         info "    --ops-file ${features_dir}/compute_isolation-enabled.yml \\"
         info "    --ops-file ${features_dir}/routing_table_sharding_mode-isolation_segment_list.yml"
         return 0
@@ -902,10 +939,15 @@ configure_segment() {
     temp_product_yml=$(mktemp)
     sed "s/^product-name: .*/product-name: ${product_name}/" "$product_yml" > "$temp_product_yml"
 
+    # Build vars file arguments
+    local vars_args=("--vars-file" "$default_vars" "--vars-file" "$vars_file")
+    if [[ -n "$secrets_file" ]]; then
+        vars_args+=("--vars-file" "$secrets_file")
+    fi
+
     if om configure-product \
         --config "$temp_product_yml" \
-        --vars-file "$default_vars" \
-        --vars-file "$vars_file" \
+        "${vars_args[@]}" \
         --ops-file "${features_dir}/compute_isolation-enabled.yml" \
         --ops-file "${features_dir}/routing_table_sharding_mode-isolation_segment_list.yml"; then
 
