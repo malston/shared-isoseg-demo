@@ -4,8 +4,7 @@ product-name: p-isolation-segment
 network-properties:
   network:
     name: ((network_name))
-  other_availability_zones:
-  - name: ((singleton_availability_zone))
+  other_availability_zones: ((other_availability_zones))
   singleton_availability_zone:
     name: ((singleton_availability_zone))
 product-properties:

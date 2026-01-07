@@ -9,6 +9,9 @@
 # Network configuration
 network_name: tas-Deployment
 singleton_availability_zone: az2
+other_availability_zones:
+- name: az1
+- name: az2
 
 # SSL certificate name (cert/key values in secrets/ssl-certs.yml)
 networking_poe_ssl_certs_0_name: small-cell
