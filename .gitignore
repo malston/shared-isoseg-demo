@@ -21,3 +21,9 @@ p-isolation-segment.yml
 *.swp
 *.swo
 .worktrees/
+settings.local.json
+
+# AI
+**/CLAUDE.md
+!.claude/CLAUDE.md
+!/CLAUDE.md
