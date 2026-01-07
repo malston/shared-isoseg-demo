@@ -21,7 +21,7 @@ Simply assign a space to an isolation segment and restart apps - developers and 
 
 ```bash
 # Platform operator
-cf set-space-isolation-segment production-space high-density
+cf set-space-isolation-segment production-space large-cell
 cf restart app-name
 
 # Developer/Pipeline - NO CHANGES NEEDED
@@ -38,12 +38,21 @@ Same space names, same routes, same URLs, same `cf push` commands. Zero coordina
 **[isolation-segments-performance-density.md](./isolation-segments-performance-density.md)**
 
 - Comprehensive implementation guide
-- Segment strategy examples (high-density, high-performance, high-memory, high-CPU)
+- Segment strategy examples (large-cell, high-performance, high-memory, high-CPU)
+- Density trade-offs and right-sizing guidance
 - Gradual migration methodology with zero downtime
 - Capacity planning calculations and examples
 - Monitoring best practices
 - Rollback procedures
 - Complete implementation roadmap
+
+**[isolation-segment-deployment-workflow.md](./isolation-segment-deployment-workflow.md)**
+
+- Step-by-step deployment workflow for multiple isolation segments
+- Replicator tool usage and tile replication
+- Configuration file examples with all required properties
+- Troubleshooting guide for common issues (job naming, property errors)
+- Quick reference commands
 
 ### 🔧 Automation Scripts
 
@@ -96,20 +105,30 @@ cf target
 
 ### 3. Create an Isolation Segment
 
+**For detailed workflow, see [isolation-segment-deployment-workflow.md](./isolation-segment-deployment-workflow.md)**
+
 **Production (Tile-based - SUPPORTED):**
 
 ```bash
-# Install tile
-./scripts/isolation-segment-tile-migration.sh install-tile \
-  --tile-path ~/Downloads/isolation-segment-6.0.x.pivotal
+# Download replicator tool (for multiple segments)
+./scripts/isolation-segment-tile-migration.sh download-replicator --version '10.2.5+LTS-T'
 
-# Configure via Ops Manager UI or:
-./scripts/isolation-segment-tile-migration.sh configure-segment \
-  --name high-density \
-  --cell-count 120
+# Replicate tile for each segment
+/tmp/replicator -name small-cell -path p-isolation-segment-10.2.5.pivotal \
+    -output small-cell-10.2.5.pivotal
 
-# Apply changes in Ops Manager, then register
-./scripts/isolation-segment-tile-migration.sh register-segment --name high-density
+# Upload and stage tile
+om upload-product --product small-cell-10.2.5.pivotal
+om stage-product --product-name p-isolation-segment-small-cell --product-version 10.2.5
+
+# Configure (see workflow guide for config file examples)
+om configure-product --config config/isolation-segment/small-cell-config.yml
+
+# Apply changes in Ops Manager
+om apply-changes --product-name p-isolation-segment-small-cell
+
+# Register segment in Cloud Controller
+cf create-isolation-segment small-cell
 ```
 
 **Testing only (BOSH direct - NOT SUPPORTED):**
@@ -130,7 +149,7 @@ cf target
 ./scripts/isolation-segment-migration.sh migrate \
   --org production-org \
   --space prod-space \
-  --segment high-density \
+  --segment small-cell \
   --entitle \
   --dry-run
 
@@ -138,7 +157,7 @@ cf target
 ./scripts/isolation-segment-migration.sh migrate \
   --org production-org \
   --space prod-space \
-  --segment high-density \
+  --segment small-cell \
   --entitle \
   --batch-size 10 \
   --delay 30
@@ -184,7 +203,7 @@ cf target
 
 **Network path:**
 
-```
+```text
 Client → Existing LB → TAS Gorouter → App (Shared or Isolation Segment Diego Cell)
                                             ↑
                                        Only this changes
@@ -200,7 +219,7 @@ Client → Existing LB → TAS Gorouter → App (Shared or Isolation Segment Die
 
 | Segment Type | Cell Size | Best For |
 |--------------|-----------|----------|
-| **High-Density** | 8/64 (8 vCPU, 64GB) | Microservices, web apps, background workers |
+| **Large-Cell** | 8/64 (8 vCPU, 64GB) | Microservices, web apps, background workers |
 | **High-Performance** | 4/32 (4 vCPU, 32GB) | Production apps, strict SLAs, revenue-critical |
 | **High-Memory** | 4/128 (4 vCPU, 128GB) | Analytics, data processing, large Java apps |
 | **High-CPU** | 8/32 (8 vCPU, 32GB) | Image/video processing, ML inference, compute-heavy |

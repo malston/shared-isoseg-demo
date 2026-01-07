@@ -1,0 +1,122 @@
+product-name: p-isolation-segment
+network-properties:
+  network:
+    name: ((network_name))
+  other_availability_zones:
+  - name: ((singleton_availability_zone))
+  singleton_availability_zone:
+    name: ((singleton_availability_zone))
+product-properties:
+  .isolated_router.disable_insecure_cookies:
+    value: ((isolated_router_disable_insecure_cookies))
+  .isolated_router.drain_timeout:
+    value: ((isolated_router_drain_timeout))
+  .isolated_router.drain_wait:
+    value: ((isolated_router_drain_wait))
+  .isolated_router.enable_nontls_health_checks:
+    value: ((isolated_router_enable_nontls_health_checks))
+  .isolated_router.enable_w3c:
+    value: ((isolated_router_enable_w3c))
+  .isolated_router.enable_write_access_logs:
+    value: ((isolated_router_enable_write_access_logs))
+  .isolated_router.enable_zipkin:
+    value: ((isolated_router_enable_zipkin))
+  .isolated_router.http_2_request_timeout_in_seconds:
+    value: ((isolated_router_http_2_request_timeout_in_seconds))
+  .isolated_router.lb_healthy_threshold:
+    value: ((isolated_router_lb_healthy_threshold))
+  .isolated_router.max_header_kb:
+    value: ((isolated_router_max_header_kb))
+  .isolated_router.request_timeout_in_seconds:
+    value: ((isolated_router_request_timeout_in_seconds))
+  .properties.app_graceful_shutdown_period_in_seconds:
+    value: ((app_graceful_shutdown_period_in_seconds))
+  .properties.app_log_rate_limiting:
+    value: disable
+  .properties.compute_isolation:
+    value: disabled
+  .properties.enable_container_network_metrics:
+    value: ((enable_container_network_metrics))
+  .properties.enable_cpu_throttling:
+    value: ((enable_cpu_throttling))
+  .properties.enable_garden_containerd_mode:
+    value: ((enable_garden_containerd_mode))
+  .properties.enable_silk_policy_enforcement:
+    value: ((enable_silk_policy_enforcement))
+  .properties.enable_smb_volume_driver:
+    value: ((enable_smb_volume_driver))
+  .properties.garden_disk_cleanup:
+    value: reserved
+  .properties.garden_disk_cleanup.reserved.reserved_space_for_other_jobs_in_mb:
+    value: ((garden_disk_cleanup_reserved_reserved_space_for_other_jobs_in_mb))
+  .properties.gorouter_customize_metrics_reporting:
+    value: disable
+  .properties.gorouter_ssl_ciphers:
+    value: ((gorouter_ssl_ciphers))
+  .properties.networking_poe_ssl_certs:
+    value:
+    - certificate:
+        cert_pem: ((networking_poe_ssl_certs_0_certificate))
+        private_key_pem: ((networking_poe_ssl_certs_0_privatekey))
+      name: ((networking_poe_ssl_certs_0_name))
+  .properties.nfs_volume_driver:
+    value: enable
+  .properties.policy_enforcement_poll_interval:
+    value: ((policy_enforcement_poll_interval))
+  .properties.route_integrity:
+    value: mutual_tls_verify
+  .properties.route_services_internal_lookup:
+    value: ((route_services_internal_lookup))
+  .properties.route_services_internal_server_port:
+    value: ((route_services_internal_server_port))
+  .properties.router_backend_max_conn:
+    value: ((router_backend_max_conn))
+  .properties.router_balancing_algorithm:
+    value: round-robin
+  .properties.router_balancing_algorithm_az_preference:
+    value: none
+  .properties.router_client_cert_validation:
+    value: request
+  .properties.router_enable_log_attempt_details:
+    value: ((router_enable_log_attempt_details))
+  .properties.router_enable_proxy:
+    value: ((router_enable_proxy))
+  .properties.router_keepalive_connections:
+    value: enable
+  .properties.router_only_trust_client_ca_certs:
+    value: disable
+  .properties.router_redact_query_parameters:
+    value: none
+  .properties.router_sticky_session_cookie_names:
+    value:
+    - name: JSESSIONID
+  .properties.router_sticky_sessions_for_auth_negotiate:
+    value: ((router_sticky_sessions_for_auth_negotiate))
+  .properties.routing_disable_http:
+    value: ((routing_disable_http))
+  .properties.routing_log_client_ips:
+    value: log_client_ips
+  .properties.routing_table_sharding_mode:
+    value: no_isolation_segment
+  .properties.routing_tls_termination:
+    value: load_balancer
+  .properties.routing_tls_version_range:
+    value: tls_v1_2_v1_3
+  .properties.smoke_tests_isolation:
+    value: on_demand
+  .properties.system_logging:
+    value: disabled
+resource-config:
+  isolated_diego_cell:
+    instance_type:
+      id: ((resource-var-isolated_diego_cell_instance_type))
+    instances: ((resource-var-isolated_diego_cell_instances))
+    max_in_flight: ((resource-var-isolated_diego_cell_max_in_flight))
+  isolated_router:
+    instance_type:
+      id: ((resource-var-isolated_router_instance_type))
+    instances: ((resource-var-isolated_router_instances))
+    max_in_flight: ((resource-var-isolated_router_max_in_flight))
+errand-config:
+  smoke_tests_isolation:
+    post-deploy-state: ((smoke_tests_isolation_post_deploy_state))

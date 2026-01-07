@@ -17,6 +17,15 @@ VERSION="1.0.0"
 : "${DEMO_SKIP_BOSH:=false}"
 : "${VERBOSE:=false}"
 
+# Dual-segment mode configuration
+: "${DEMO_DUAL_SEGMENT:=false}"
+: "${DEMO_SEGMENT_A:=shared-demo}"
+: "${DEMO_SEGMENT_B:=small-cell}"
+: "${DEMO_SPACE_A:=workload-a}"
+: "${DEMO_SPACE_B:=workload-b}"
+: "${DEMO_APP_A:=spring-music}"
+: "${DEMO_APP_B:=cf-env}"
+
 # State file for comparison
 STATE_FILE="/tmp/demo-state-$(date +%s).json"
 
@@ -478,6 +487,231 @@ setup_demo_environment() {
     echo ""
 }
 
+setup_dual_segment_environment() {
+    info "Creating dual-segment demo environment..."
+
+    # Create org if it doesn't exist
+    if cf org "$DEMO_ORG" &> /dev/null; then
+        debug "Org $DEMO_ORG already exists"
+    else
+        info "Creating org: $DEMO_ORG"
+        if cf create-org "$DEMO_ORG"; then
+            success "Org '$DEMO_ORG' created"
+        else
+            fatal "Failed to create org $DEMO_ORG"
+        fi
+    fi
+
+    # Target org
+    if ! cf target -o "$DEMO_ORG" &> /dev/null; then
+        fatal "Failed to target org $DEMO_ORG"
+    fi
+
+    # Check if both isolation segments exist
+    local segments_missing=false
+
+    if cf isolation-segments | tail -n +4 | grep -q "^${DEMO_SEGMENT_A}[[:space:]]"; then
+        success "Isolation segment '$DEMO_SEGMENT_A' exists"
+    else
+        error "Isolation segment '$DEMO_SEGMENT_A' does not exist"
+        segments_missing=true
+    fi
+
+    if cf isolation-segments | tail -n +4 | grep -q "^${DEMO_SEGMENT_B}[[:space:]]"; then
+        success "Isolation segment '$DEMO_SEGMENT_B' exists"
+    else
+        error "Isolation segment '$DEMO_SEGMENT_B' does not exist"
+        segments_missing=true
+    fi
+
+    if [[ "$segments_missing" == "true" ]]; then
+        fatal "Both isolation segments must exist before running dual-segment demo"
+    fi
+
+    # Entitle org to both segments
+    info "Entitling org to isolation segments..."
+    cf enable-org-isolation "$DEMO_ORG" "$DEMO_SEGMENT_A" &> /dev/null || true
+    cf enable-org-isolation "$DEMO_ORG" "$DEMO_SEGMENT_B" &> /dev/null || true
+    success "Org entitled to '$DEMO_SEGMENT_A' and '$DEMO_SEGMENT_B'"
+
+    # Create space A if it doesn't exist
+    if cf space "$DEMO_SPACE_A" &> /dev/null; then
+        debug "Space $DEMO_SPACE_A already exists"
+    else
+        info "Creating space: $DEMO_SPACE_A"
+        if cf create-space "$DEMO_SPACE_A"; then
+            success "Space '$DEMO_SPACE_A' created"
+        else
+            fatal "Failed to create space $DEMO_SPACE_A"
+        fi
+    fi
+
+    # Create space B if it doesn't exist
+    if cf space "$DEMO_SPACE_B" &> /dev/null; then
+        debug "Space $DEMO_SPACE_B already exists"
+    else
+        info "Creating space: $DEMO_SPACE_B"
+        if cf create-space "$DEMO_SPACE_B"; then
+            success "Space '$DEMO_SPACE_B' created"
+        else
+            fatal "Failed to create space $DEMO_SPACE_B"
+        fi
+    fi
+
+    # Assign space A to segment A
+    info "Assigning '$DEMO_SPACE_A' to segment '$DEMO_SEGMENT_A'..."
+    if cf set-space-isolation-segment "$DEMO_SPACE_A" "$DEMO_SEGMENT_A"; then
+        success "Space '$DEMO_SPACE_A' assigned to '$DEMO_SEGMENT_A'"
+    else
+        fatal "Failed to assign space to segment"
+    fi
+
+    # Assign space B to segment B
+    info "Assigning '$DEMO_SPACE_B' to segment '$DEMO_SEGMENT_B'..."
+    if cf set-space-isolation-segment "$DEMO_SPACE_B" "$DEMO_SEGMENT_B"; then
+        success "Space '$DEMO_SPACE_B' assigned to '$DEMO_SEGMENT_B'"
+    else
+        fatal "Failed to assign space to segment"
+    fi
+
+    # Verify BOSH deployments if available
+    if [[ "$DEMO_SKIP_BOSH" != "true" ]]; then
+        info "Verifying isolation segment deployments..."
+
+        local iso_deployments
+        iso_deployments=$(bosh deployments --json 2>/dev/null | jq -r '.Tables[0].Rows[] | select(.name | startswith("p-isolation-segment-")) | .name' | wc -l | tr -d ' ')
+
+        if [[ "$iso_deployments" -ge 1 ]]; then
+            success "Found $iso_deployments isolation segment deployment(s)"
+        else
+            warn "Could not verify isolation segment deployments via BOSH"
+        fi
+    fi
+
+    echo ""
+}
+
+#######################################
+# Dual-Segment Deployment Functions
+#######################################
+
+deploy_spring_music_app() {
+    local target_space="$1"
+    local app_name="$2"
+
+    info "Deploying Spring Music to space '$target_space'..."
+
+    # Target the space
+    cf target -o "$DEMO_ORG" -s "$target_space" &> /dev/null
+
+    # Check if app already exists
+    if cf app "$app_name" &> /dev/null; then
+        warn "App $app_name already exists. Deleting it first..."
+        cf delete "$app_name" -f -r
+    fi
+
+    # Use local spring-music JAR or build if needed
+    local app_jar="$HOME/spring-music/build/libs/spring-music-1.0.jar"
+
+    if [[ ! -f "$app_jar" ]]; then
+        warn "Spring Music JAR not found at $app_jar"
+        info "Building Spring Music from source..."
+        if [[ -d "$HOME/spring-music" ]]; then
+            (cd "$HOME/spring-music" && ./gradlew clean build -x test)
+            success "Built Spring Music at $app_jar"
+        else
+            fatal "Spring Music repository not found at $HOME/spring-music. Please clone: git clone https://github.com/cloudfoundry-samples/spring-music ~/spring-music"
+        fi
+    fi
+
+    # Push app
+    info "Deploying $app_name..."
+    if cf push "$app_name" -p "$app_jar" -b java_buildpack_offline -s cflinuxfs4 --no-start; then
+        success "App $app_name pushed successfully"
+    else
+        fatal "Failed to push app $app_name"
+    fi
+
+    # Set Java version to 17
+    cf set-env "$app_name" JBP_CONFIG_OPEN_JDK_JRE '{ jre: { version: 17.+ } }'
+
+    # Start app
+    info "Starting $app_name..."
+    if cf start "$app_name"; then
+        success "$app_name started successfully"
+    else
+        fatal "Failed to start $app_name"
+    fi
+
+    # Get app URL
+    local app_url
+    app_url=$(cf app "$app_name" | grep "routes:" | awk '{print $2}')
+    if [[ -n "$app_url" ]]; then
+        success "$app_name running at: https://$app_url"
+    fi
+}
+
+deploy_cf_env_app() {
+    local target_space="$1"
+    local app_name="$2"
+
+    info "Deploying cf-env to space '$target_space'..."
+
+    # Target the space
+    cf target -o "$DEMO_ORG" -s "$target_space" &> /dev/null
+
+    # Check if app already exists
+    if cf app "$app_name" &> /dev/null; then
+        warn "App $app_name already exists. Deleting it first..."
+        cf delete "$app_name" -f -r
+    fi
+
+    # Find cf-env app directory (relative to this script)
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local cf_env_dir="${script_dir}/../apps/cf-env"
+
+    if [[ ! -d "$cf_env_dir" ]]; then
+        fatal "cf-env app not found at $cf_env_dir"
+    fi
+
+    # Push app
+    info "Deploying $app_name..."
+    if cf push "$app_name" -p "$cf_env_dir" -b go_buildpack -s cflinuxfs4 -m 64M -k 128M; then
+        success "$app_name deployed successfully"
+    else
+        fatal "Failed to deploy $app_name"
+    fi
+
+    # Get app URL
+    local app_url
+    app_url=$(cf app "$app_name" | grep "routes:" | awk '{print $2}')
+    if [[ -n "$app_url" ]]; then
+        success "$app_name running at: https://$app_url"
+    fi
+}
+
+deploy_dual_segment_apps() {
+    phase_header "Phase 2" "Deploy Apps to Isolation Segments"
+
+    info "Deploying two apps to two isolation segments..."
+    info "  App A: $DEMO_APP_A → Space: $DEMO_SPACE_A → Segment: $DEMO_SEGMENT_A"
+    info "  App B: $DEMO_APP_B → Space: $DEMO_SPACE_B → Segment: $DEMO_SEGMENT_B"
+    echo ""
+
+    # Deploy Spring Music to segment A
+    deploy_spring_music_app "$DEMO_SPACE_A" "$DEMO_APP_A"
+
+    # Deploy cf-env to segment B
+    deploy_cf_env_app "$DEMO_SPACE_B" "$DEMO_APP_B"
+
+    # Wait for apps to stabilize
+    info "Waiting for apps to stabilize..."
+    sleep 5
+
+    echo ""
+}
+
 deploy_app_before_isolation() {
     phase_header "Phase 2" "Deploy App (BEFORE Isolation Segment)"
 
@@ -820,6 +1054,172 @@ display_comparison() {
 }
 
 #######################################
+# Dual-Segment State and Display
+#######################################
+
+get_app_state() {
+    local app_name="$1"
+    local space_name="$2"
+    local segment_name="$3"
+
+    # Target the space
+    cf target -o "$DEMO_ORG" -s "$space_name" &> /dev/null
+
+    # Get app info
+    local app_guid
+    app_guid=$(cf app "$app_name" --guid 2>/dev/null || echo "unknown")
+
+    local app_state
+    app_state=$(cf app "$app_name" 2>/dev/null | grep "^requested state:" | awk '{print $3}' || echo "unknown")
+
+    local cell_ip
+    cell_ip=$(cf ssh "$app_name" -c 'echo $CF_INSTANCE_IP' 2>/dev/null || echo "unknown")
+
+    local app_url
+    app_url=$(cf app "$app_name" 2>/dev/null | grep "routes:" | awk '{print $2}' || echo "unknown")
+
+    # Build JSON
+    cat <<EOF
+{
+  "app_name": "$app_name",
+  "app_guid": "$app_guid",
+  "space": "$space_name",
+  "isolation_segment": "$segment_name",
+  "state": "$app_state",
+  "cell_ip": "$cell_ip",
+  "app_url": "$app_url"
+}
+EOF
+}
+
+capture_dual_segment_state() {
+    info "Capturing dual-segment state..."
+
+    # Capture state for App A
+    local app_a_state
+    app_a_state=$(get_app_state "$DEMO_APP_A" "$DEMO_SPACE_A" "$DEMO_SEGMENT_A")
+
+    # Capture state for App B
+    local app_b_state
+    app_b_state=$(get_app_state "$DEMO_APP_B" "$DEMO_SPACE_B" "$DEMO_SEGMENT_B")
+
+    # Build combined state
+    local dual_state
+    dual_state=$(cat <<EOF
+{
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "mode": "dual-segment",
+  "app_a": $app_a_state,
+  "app_b": $app_b_state
+}
+EOF
+    )
+
+    # Validate and save
+    if echo "$dual_state" | jq empty 2>/dev/null; then
+        echo "$dual_state" > "$STATE_FILE"
+        success "Dual-segment state captured"
+    else
+        error "Generated invalid JSON for dual-segment state"
+        fatal "State capture failed"
+    fi
+
+    echo ""
+}
+
+display_dual_segment_state() {
+    section_header "DUAL-SEGMENT DEPLOYMENT STATE"
+
+    local state
+    state=$(cat "$STATE_FILE")
+
+    local app_a app_b
+    app_a=$(echo "$state" | jq -r '.app_a')
+    app_b=$(echo "$state" | jq -r '.app_b')
+
+    echo -e "${BOLD}App A: $(echo "$app_a" | jq -r '.app_name') (Java - Heavy Workload)${NC}"
+    echo "   Space:              $(echo "$app_a" | jq -r '.space')"
+    echo -e "   Isolation Segment:  ${GREEN}$(echo "$app_a" | jq -r '.isolation_segment')${NC}"
+    echo "   State:              $(echo "$app_a" | jq -r '.state')"
+    echo "   Cell IP:            $(echo "$app_a" | jq -r '.cell_ip')"
+    echo "   URL:                https://$(echo "$app_a" | jq -r '.app_url')"
+    echo ""
+
+    echo -e "${BOLD}App B: $(echo "$app_b" | jq -r '.app_name') (Go - Lightweight Workload)${NC}"
+    echo "   Space:              $(echo "$app_b" | jq -r '.space')"
+    echo -e "   Isolation Segment:  ${GREEN}$(echo "$app_b" | jq -r '.isolation_segment')${NC}"
+    echo "   State:              $(echo "$app_b" | jq -r '.state')"
+    echo "   Cell IP:            $(echo "$app_b" | jq -r '.cell_ip')"
+    echo "   URL:                https://$(echo "$app_b" | jq -r '.app_url')"
+    echo ""
+}
+
+display_dual_segment_comparison() {
+    section_header "WORKLOAD ISOLATION COMPARISON"
+
+    local state
+    state=$(cat "$STATE_FILE")
+
+    local app_a app_b
+    app_a=$(echo "$state" | jq -r '.app_a')
+    app_b=$(echo "$state" | jq -r '.app_b')
+
+    if [[ "$DEMO_MODE" == "interactive" ]]; then
+        # Pretty table format
+        echo "┌─────────────────────┬────────────────────────┬────────────────────────┐"
+        echo "│ Attribute           │ App A (Heavy)          │ App B (Light)          │"
+        echo "├─────────────────────┼────────────────────────┼────────────────────────┤"
+
+        printf "│ %-19s │ %-22s │ %-22s │\n" \
+            "App Name" \
+            "$(echo "$app_a" | jq -r '.app_name')" \
+            "$(echo "$app_b" | jq -r '.app_name')"
+
+        printf "│ %-19s │ %-22s │ %-22s │\n" \
+            "Workload Type" \
+            "Java (Spring Music)" \
+            "Go (cf-env)"
+
+        printf "│ %-19s │ ${CYAN}%-22s${NC} │ ${MAGENTA}%-22s${NC} │\n" \
+            "Isolation Segment" \
+            "$(echo "$app_a" | jq -r '.isolation_segment')" \
+            "$(echo "$app_b" | jq -r '.isolation_segment')"
+
+        printf "│ %-19s │ %-22s │ %-22s │\n" \
+            "Space" \
+            "$(echo "$app_a" | jq -r '.space')" \
+            "$(echo "$app_b" | jq -r '.space')"
+
+        printf "│ %-19s │ ${GREEN}%-22s${NC} │ ${GREEN}%-22s${NC} │\n" \
+            "Cell IP" \
+            "$(echo "$app_a" | jq -r '.cell_ip')" \
+            "$(echo "$app_b" | jq -r '.cell_ip')"
+
+        printf "│ %-19s │ %-22s │ %-22s │\n" \
+            "State" \
+            "$(echo "$app_a" | jq -r '.state')" \
+            "$(echo "$app_b" | jq -r '.state')"
+
+        echo "└─────────────────────┴────────────────────────┴────────────────────────┘"
+        echo ""
+
+        echo -e "${BOLD}KEY TAKEAWAYS:${NC}"
+        echo "  ✅ Different workloads on different isolation segments"
+        echo "  ✅ Each segment has dedicated Diego cells"
+        echo "  ✅ Workloads are physically isolated (different Cell IPs)"
+        echo "  ✅ Space-to-segment mapping controls placement"
+        echo "  ✅ No code changes required - just CF configuration"
+        echo ""
+    else
+        # Compact format for automated mode
+        echo "DUAL-SEGMENT COMPARISON:"
+        echo "  App A ($DEMO_APP_A): segment=$(echo "$app_a" | jq -r '.isolation_segment'), cell=$(echo "$app_a" | jq -r '.cell_ip')"
+        echo "  App B ($DEMO_APP_B): segment=$(echo "$app_b" | jq -r '.isolation_segment'), cell=$(echo "$app_b" | jq -r '.cell_ip')"
+        echo ""
+    fi
+}
+
+#######################################
 # Cleanup Functions
 #######################################
 
@@ -845,8 +1245,15 @@ cleanup_demo() {
     if [[ "$should_cleanup" != "true" ]]; then
         info "Skipping cleanup. Demo environment preserved."
         info "To clean up manually:"
-        info "  cf delete $DEMO_APP_NAME -f -r"
-        info "  cf delete-space $DEMO_SPACE -f"
+        if [[ "$DEMO_DUAL_SEGMENT" == "true" ]]; then
+            info "  cf delete $DEMO_APP_A -f -r"
+            info "  cf delete $DEMO_APP_B -f -r"
+            info "  cf delete-space $DEMO_SPACE_A -f"
+            info "  cf delete-space $DEMO_SPACE_B -f"
+        else
+            info "  cf delete $DEMO_APP_NAME -f -r"
+            info "  cf delete-space $DEMO_SPACE -f"
+        fi
         info "  cf delete-org $DEMO_ORG -f"
         echo ""
         return 0
@@ -854,22 +1261,61 @@ cleanup_demo() {
 
     info "Cleaning up demo environment..."
 
-    # Delete app
-    if cf app "$DEMO_APP_NAME" &> /dev/null; then
-        info "Deleting app: $DEMO_APP_NAME"
-        cf delete "$DEMO_APP_NAME" -f -r
-        success "App deleted"
-    fi
+    if [[ "$DEMO_DUAL_SEGMENT" == "true" ]]; then
+        # Dual-segment cleanup
 
-    # Reset space isolation segment
-    info "Resetting space isolation segment..."
-    cf reset-space-isolation-segment "$DEMO_SPACE" &> /dev/null || true
+        # Delete apps
+        cf target -o "$DEMO_ORG" -s "$DEMO_SPACE_A" &> /dev/null || true
+        if cf app "$DEMO_APP_A" &> /dev/null; then
+            info "Deleting app: $DEMO_APP_A"
+            cf delete "$DEMO_APP_A" -f -r
+            success "App $DEMO_APP_A deleted"
+        fi
 
-    # Delete space
-    if cf space "$DEMO_SPACE" &> /dev/null; then
-        info "Deleting space: $DEMO_SPACE"
-        cf delete-space "$DEMO_SPACE" -f
-        success "Space deleted"
+        cf target -o "$DEMO_ORG" -s "$DEMO_SPACE_B" &> /dev/null || true
+        if cf app "$DEMO_APP_B" &> /dev/null; then
+            info "Deleting app: $DEMO_APP_B"
+            cf delete "$DEMO_APP_B" -f -r
+            success "App $DEMO_APP_B deleted"
+        fi
+
+        # Reset space isolation segments
+        info "Resetting space isolation segments..."
+        cf reset-space-isolation-segment "$DEMO_SPACE_A" &> /dev/null || true
+        cf reset-space-isolation-segment "$DEMO_SPACE_B" &> /dev/null || true
+
+        # Delete spaces
+        if cf space "$DEMO_SPACE_A" &> /dev/null; then
+            info "Deleting space: $DEMO_SPACE_A"
+            cf delete-space "$DEMO_SPACE_A" -f
+            success "Space $DEMO_SPACE_A deleted"
+        fi
+
+        if cf space "$DEMO_SPACE_B" &> /dev/null; then
+            info "Deleting space: $DEMO_SPACE_B"
+            cf delete-space "$DEMO_SPACE_B" -f
+            success "Space $DEMO_SPACE_B deleted"
+        fi
+    else
+        # Single-segment cleanup
+
+        # Delete app
+        if cf app "$DEMO_APP_NAME" &> /dev/null; then
+            info "Deleting app: $DEMO_APP_NAME"
+            cf delete "$DEMO_APP_NAME" -f -r
+            success "App deleted"
+        fi
+
+        # Reset space isolation segment
+        info "Resetting space isolation segment..."
+        cf reset-space-isolation-segment "$DEMO_SPACE" &> /dev/null || true
+
+        # Delete space
+        if cf space "$DEMO_SPACE" &> /dev/null; then
+            info "Deleting space: $DEMO_SPACE"
+            cf delete-space "$DEMO_SPACE" -f
+            success "Space deleted"
+        fi
     fi
 
     # Delete org
@@ -881,10 +1327,14 @@ cleanup_demo() {
 
     # Optionally delete isolation segment
     if [[ "$DEMO_CLEANUP" == "full" ]]; then
-        if cf isolation-segments | grep -q "^${DEMO_SEGMENT}$"; then
-            info "Deleting isolation segment: $DEMO_SEGMENT"
-            cf delete-isolation-segment "$DEMO_SEGMENT" -f || warn "Could not delete segment (may be in use)"
+        if [[ "$DEMO_DUAL_SEGMENT" != "true" ]]; then
+            if cf isolation-segments | grep -q "^${DEMO_SEGMENT}$"; then
+                info "Deleting isolation segment: $DEMO_SEGMENT"
+                cf delete-isolation-segment "$DEMO_SEGMENT" -f || warn "Could not delete segment (may be in use)"
+            fi
         fi
+        # Note: In dual-segment mode, we don't delete the isolation segments
+        # as they're likely shared infrastructure
     fi
 
     # Clean up temp files
@@ -907,6 +1357,10 @@ Usage: $0 [OPTIONS]
 Interactive demo script showing zero-impact migration from shared Diego cells
 to isolated Diego cells in Cloud Foundry.
 
+MODES:
+  Single-segment (default): Migrate one app from shared cells to isolation segment
+  Dual-segment (--dual-segment): Deploy two apps to two different isolation segments
+
 OPTIONS:
   --automated              Run in automated mode (no pauses)
   --interactive            Run in interactive mode with pauses (default)
@@ -921,25 +1375,45 @@ OPTIONS:
   -h, --help               Show this help message
   -v, --version            Show version
 
+DUAL-SEGMENT OPTIONS:
+  --dual-segment           Enable dual-segment mode (two apps, two segments)
+  --segment-a NAME         First isolation segment (default: $DEMO_SEGMENT_A)
+  --segment-b NAME         Second isolation segment (default: $DEMO_SEGMENT_B)
+
 ENVIRONMENT VARIABLES:
   DEMO_MODE                Operating mode: 'interactive' or 'automated'
-  DEMO_SEGMENT             Isolation segment name
+  DEMO_SEGMENT             Isolation segment name (single-segment mode)
   DEMO_ORG                 Org name
-  DEMO_SPACE               Space name
-  DEMO_APP_NAME            App name
+  DEMO_SPACE               Space name (single-segment mode)
+  DEMO_APP_NAME            App name (single-segment mode)
   DEMO_CLEANUP             Cleanup mode: 'ask', 'true', 'false', 'full'
   DEMO_SKIP_BOSH           Skip BOSH verification: 'true' or 'false'
   VERBOSE                  Enable debug logging: 'true' or 'false'
 
+DUAL-SEGMENT ENVIRONMENT VARIABLES:
+  DEMO_DUAL_SEGMENT        Enable dual-segment mode: 'true' or 'false'
+  DEMO_SEGMENT_A           First segment name (default: shared-demo)
+  DEMO_SEGMENT_B           Second segment name (default: small-cell)
+  DEMO_SPACE_A             First space name (default: workload-a)
+  DEMO_SPACE_B             Second space name (default: workload-b)
+  DEMO_APP_A               First app name (default: spring-music)
+  DEMO_APP_B               Second app name (default: cf-env)
+
 EXAMPLES:
-  # Interactive mode (default)
+  # Interactive mode (default) - single segment
   $0
 
   # Automated mode with cleanup
   $0 --automated --cleanup
 
   # Custom segment and org
-  $0 --segment high-density --org prod-demo --space demo
+  $0 --segment large-cell --org prod-demo --space demo
+
+  # Dual-segment mode - two apps on two segments
+  $0 --dual-segment
+
+  # Dual-segment with custom segments
+  $0 --dual-segment --segment-a shared-demo --segment-b small-cell
 
   # Skip BOSH verification
   $0 --skip-bosh
@@ -1000,6 +1474,18 @@ main() {
                 DEMO_SKIP_BOSH="true"
                 shift
                 ;;
+            --dual-segment)
+                DEMO_DUAL_SEGMENT="true"
+                shift
+                ;;
+            --segment-a)
+                DEMO_SEGMENT_A="$2"
+                shift 2
+                ;;
+            --segment-b)
+                DEMO_SEGMENT_B="$2"
+                shift 2
+                ;;
             --verbose)
                 VERBOSE="true"
                 shift
@@ -1023,56 +1509,101 @@ main() {
     # Rest of main function
     # Show banner
     if [[ "$DEMO_MODE" == "interactive" ]]; then
-        section_header "Isolation Segment Migration Demo"
+        if [[ "$DEMO_DUAL_SEGMENT" == "true" ]]; then
+            section_header "Dual-Segment Isolation Demo"
+        else
+            section_header "Isolation Segment Migration Demo"
+        fi
     else
-        log "Starting isolation segment migration demo"
+        if [[ "$DEMO_DUAL_SEGMENT" == "true" ]]; then
+            log "Starting dual-segment isolation demo"
+        else
+            log "Starting isolation segment migration demo"
+        fi
     fi
 
     # Validate prerequisites
     validate_prerequisites
 
+    # Display configuration
     info "Demo configuration:"
     info "  Mode: $DEMO_MODE"
     info "  Org: $DEMO_ORG"
-    info "  Space: $DEMO_SPACE"
-    info "  Segment: $DEMO_SEGMENT"
-    info "  App: $DEMO_APP_NAME"
+
+    if [[ "$DEMO_DUAL_SEGMENT" == "true" ]]; then
+        info "  Dual-segment: ENABLED"
+        info "  Segment A: $DEMO_SEGMENT_A (space: $DEMO_SPACE_A, app: $DEMO_APP_A)"
+        info "  Segment B: $DEMO_SEGMENT_B (space: $DEMO_SPACE_B, app: $DEMO_APP_B)"
+    else
+        info "  Space: $DEMO_SPACE"
+        info "  Segment: $DEMO_SEGMENT"
+        info "  App: $DEMO_APP_NAME"
+    fi
+
     info "  BOSH verification: $([ "$DEMO_SKIP_BOSH" == "true" ] && echo "disabled" || echo "enabled")"
     echo ""
 
-    # Setup environment
-    setup_demo_environment
+    if [[ "$DEMO_DUAL_SEGMENT" == "true" ]]; then
+        # ===== DUAL-SEGMENT FLOW =====
 
-    pause_for_demo "continue to app deployment"
+        # Setup environment with two spaces and segments
+        setup_dual_segment_environment
 
-    # Deploy app before isolation segment
-    deploy_app_before_isolation
+        pause_for_demo "continue to app deployment"
 
-    # Capture BEFORE state
-    capture_before_state
+        # Deploy both apps to their respective segments
+        deploy_dual_segment_apps
 
-    pause_for_demo "see BEFORE state"
+        # Capture state for both apps
+        capture_dual_segment_state
 
-    # Display BEFORE state
-    display_before_state
+        pause_for_demo "see deployment state"
 
-    pause_for_demo "enable isolation segment and restart app"
+        # Display state for both apps
+        display_dual_segment_state
 
-    # Enable isolation segment
-    enable_isolation_segment
+        pause_for_demo "see side-by-side comparison"
 
-    # Capture AFTER state
-    capture_after_state
+        # Display comparison
+        display_dual_segment_comparison
 
-    pause_for_demo "see AFTER state"
+    else
+        # ===== SINGLE-SEGMENT FLOW =====
 
-    # Display AFTER state
-    display_after_state
+        # Setup environment
+        setup_demo_environment
 
-    pause_for_demo "see side-by-side comparison"
+        pause_for_demo "continue to app deployment"
 
-    # Display comparison
-    display_comparison
+        # Deploy app before isolation segment
+        deploy_app_before_isolation
+
+        # Capture BEFORE state
+        capture_before_state
+
+        pause_for_demo "see BEFORE state"
+
+        # Display BEFORE state
+        display_before_state
+
+        pause_for_demo "enable isolation segment and restart app"
+
+        # Enable isolation segment
+        enable_isolation_segment
+
+        # Capture AFTER state
+        capture_after_state
+
+        pause_for_demo "see AFTER state"
+
+        # Display AFTER state
+        display_after_state
+
+        pause_for_demo "see side-by-side comparison"
+
+        # Display comparison
+        display_comparison
+    fi
 
     # Cleanup
     cleanup_demo

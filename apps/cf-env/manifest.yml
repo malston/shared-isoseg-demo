@@ -1,0 +1,14 @@
+# ABOUTME: CF manifest for cf-env lightweight Go app
+# ABOUTME: Minimal resource footprint for demo purposes
+applications:
+- name: cf-env
+  memory: 64M
+  disk_quota: 128M
+  instances: 1
+  buildpacks:
+  - go_buildpack
+  stack: cflinuxfs4
+  env:
+    GOVERSION: go1.21
+  health-check-type: http
+  health-check-http-endpoint: /health

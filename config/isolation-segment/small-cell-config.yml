@@ -1,0 +1,93 @@
+# ABOUTME: Working config for small-cell isolation segment
+# ABOUTME: Product name in Ops Manager is p-isolation-segment-small-cell (replicator adds prefix)
+product-name: p-isolation-segment-small-cell
+product-properties:
+  .properties.compute_isolation:
+    selected_option: enabled
+    value: enabled
+  .properties.compute_isolation.enabled.isolation_segment_name:
+    value: small-cell
+  .properties.container_networking:
+    selected_option: enable
+    value: enable
+  .properties.enable_garden_containerd_mode:
+    value: true
+  .properties.enable_silk_policy_enforcement:
+    value: true
+  .properties.enable_smb_volume_driver:
+    value: true
+  .properties.garden_disk_cleanup:
+    selected_option: reserved
+    value: reserved
+  .properties.garden_disk_cleanup.reserved.reserved_space_for_other_jobs_in_mb:
+    value: 15360
+  .properties.gorouter_ssl_ciphers:
+    value: ECDHE-RSA-AES128-GCM-SHA256:TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+  .properties.networking_poe_ssl_certs:
+    value:
+    - certificate:
+        cert_pem: ((networking_poe_ssl_cert))
+        private_key_pem: ((networking_poe_ssl_key))
+      name: ((segment_name))
+  .properties.networking_point_of_entry:
+    selected_option: terminate_at_router
+    value: terminate_at_router
+  .properties.nfs_volume_driver:
+    selected_option: enable
+    value: enable
+  .properties.route_integrity:
+    selected_option: mutual_tls_verify
+    value: mutual_tls_verify
+  .properties.router_balancing_algorithm:
+    selected_option: round_robin
+    value: round-robin
+  .properties.router_client_cert_validation:
+    selected_option: request
+    value: request
+  .properties.router_keepalive_connections:
+    selected_option: enable
+    value: enable
+  .properties.routing_log_client_ips:
+    selected_option: log_client_ips
+    value: log_client_ips
+  .properties.routing_table_sharding_mode:
+    selected_option: isolation_segment_list
+    value: isolation_segment_list
+  .properties.routing_table_sharding_mode.isolation_segment_list.names:
+    value:
+    - ((segment_name))
+  .properties.routing_tls_termination:
+    selected_option: load_balancer
+    value: load_balancer
+  .properties.routing_tls_version_range:
+    selected_option: tls_v1_2_v1_3
+    value: tls_v1_2_v1_3
+  .properties.smoke_tests_isolation:
+    selected_option: on_demand
+    value: on_demand
+  .properties.system_logging:
+    selected_option: disabled
+    value: disabled
+network-properties:
+  network:
+    name: tas-Deployment
+  other_availability_zones:
+  - name: az2
+  - name: az1
+  singleton_availability_zone:
+    name: az2
+# NOTE: Job names have segment suffix in replicated tiles
+resource-config:
+  isolated_diego_cell_((segment_name)):
+    max_in_flight: 4%
+    instance_type:
+      id: ((resource-var-isolated_diego_cell_instance_type))
+    instances: ((cell_count))
+  isolated_router_((segment_name)):
+    max_in_flight: 1
+    instance_type:
+      id: automatic
+    instances: ((router_count))
+errand-config:
+  smoke_tests_isolation:
+    post-deploy-state: true

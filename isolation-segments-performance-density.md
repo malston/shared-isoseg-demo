@@ -9,15 +9,19 @@
 ## Table of Contents
 
 1. [Strategy Overview](#strategy-overview)
-2. [Keep Existing Workloads Untouched](#keep-existing-workloads-untouched)
-3. [Create Performance-Optimized Segments](#create-performance-optimized-segments)
-4. [Gradual Migration (Opt-In Model)](#gradual-migration-opt-in-model)
-5. [Performance Benefits Without Disruption](#performance-benefits-without-disruption)
-6. [Minimal Operational Impact](#minimal-operational-impact)
-7. [Capacity Planning Example](#capacity-planning-example)
-8. [Monitoring During Migration](#monitoring-during-migration)
-9. [Rollback Plan](#rollback-plan)
-10. [Implementation Summary](#implementation-summary)
+2. [Density Trade-offs](#density-trade-offs)
+3. [Keep Existing Workloads Untouched](#keep-existing-workloads-untouched)
+4. [Create Performance-Optimized Segments](#create-performance-optimized-segments)
+5. [Gradual Migration (Opt-In Model)](#gradual-migration-opt-in-model)
+6. [Performance Benefits Without Disruption](#performance-benefits-without-disruption)
+7. [Minimal Operational Impact](#minimal-operational-impact)
+8. [Capacity Planning Example](#capacity-planning-example)
+9. [Monitoring During Migration](#monitoring-during-migration)
+10. [Rollback Plan](#rollback-plan)
+11. [Implementation Summary](#implementation-summary)
+12. [See Also](#see-also)
+
+**📋 For step-by-step deployment instructions, see [Deployment Workflow Guide](isolation-segment-deployment-workflow.md)**
 
 ---
 
@@ -38,8 +42,8 @@ This guide includes two automation scripts for managing isolation segments:
 
 ```bash
 ./scripts/isolation-segment-tile-migration.sh install-tile --tile-path isolation-segment-6.0.x.pivotal
-./scripts/isolation-segment-tile-migration.sh configure-segment --name high-density --cell-count 120
-./scripts/isolation-segment-tile-migration.sh register-segment --name high-density
+./scripts/isolation-segment-tile-migration.sh configure-segment --name large-cell --cell-count 120
+./scripts/isolation-segment-tile-migration.sh register-segment --name large-cell
 ```
 
 ### isolation-segment-migration.sh (TESTING ONLY - Unsupported)
@@ -80,7 +84,7 @@ This guide includes two automation scripts for managing isolation segments:
 
 **How it works:**
 
-1. Platform operator assigns space to isolation segment: `cf set-space-isolation-segment production-space high-density`
+1. Platform operator assigns space to isolation segment: `cf set-space-isolation-segment production-space large-cell`
 2. Platform operator restarts apps: `cf restart app-name`
 3. Apps now run on isolation segment - **developers and pipelines notice nothing**
 
@@ -106,6 +110,68 @@ This means you can migrate entire teams, business units, or workload types to op
 
 ---
 
+## Density Trade-offs
+
+**⚠️ Important:** Higher density is not always better. Before pursuing larger cells for increased density, understand the trade-offs.
+
+### When Density Becomes a Problem
+
+**Increased Blast Radius:**
+
+When a large, dense cell fails, you lose more app instances at once. A single 8/64 cell failure impacts roughly twice as many apps as a 4/32 cell failure.
+
+- More apps go down simultaneously
+- Recovery creates a "thundering herd" as Diego reschedules everything at once
+- Correlated failures become more impactful
+
+**Capacity Headroom Math Changes:**
+
+With fewer, larger cells, N+1 redundancy requires proportionally more spare capacity:
+
+- **100 × 4/32 cells:** Losing 1 cell = 1% capacity loss. Need ~2-3 spare cells.
+- **50 × 8/64 cells:** Losing 1 cell = 2% capacity loss. Need ~2-3 spare cells, but each spare is larger.
+- **Over-provisioned clusters** with large cells may not have enough headroom to absorb a failure—apps have nowhere to evacuate to.
+
+**Evacuation and Recovery Time:**
+
+Larger cells take longer to drain during maintenance or failure:
+
+- More containers to evacuate
+- More network connections to re-establish
+- Diego scheduler works harder to place displaced apps
+- Rolling updates take longer
+
+**Noisy Neighbor Amplification:**
+
+More containers on a single host means more potential for resource contention:
+
+- CPU scheduling becomes more complex
+- Memory pressure affects more apps
+- Disk I/O contention increases
+- Network bandwidth competition
+
+### Right-Sizing Guidance
+
+| Scenario | Recommended Approach |
+|----------|---------------------|
+| Stable, predictable workloads | Larger cells (8/64) may be appropriate |
+| Variable or bursty workloads | Smaller cells (4/32) provide better isolation |
+| High availability requirements | More, smaller cells reduce blast radius |
+| Cost optimization priority | Larger cells reduce overhead, but balance against risk |
+| Mixed workload types | Smaller cells allow finer-grained placement |
+
+### The Over-Provisioning Trap
+
+If your cluster has significantly more capacity than needed:
+
+1. **Don't** automatically consolidate onto fewer, larger cells
+2. **Do** consider whether the "waste" is actually providing fault tolerance
+3. **Do** model failure scenarios: "If I lose my largest cell, can the remaining cells absorb the load?"
+
+**Rule of thumb:** If losing a single cell would cause app placement failures, your cells are too large or your headroom is too small.
+
+---
+
 ## Keep Existing Workloads Untouched
 
 ### Initial Setup (Zero Impact)
@@ -127,7 +193,7 @@ This means you can migrate entire teams, business units, or workload types to op
 
 **Network Path (Unchanged):**
 
-```
+```text
 Client → Existing LB → TAS Gorouter → App (Shared or Segment)
 ```
 
@@ -137,12 +203,12 @@ Client → Existing LB → TAS Gorouter → App (Shared or Segment)
 
 ### Segment Strategy Examples
 
-#### High-Density Segment
+#### Large-Cell Segment
 
-**Purpose:** Maximize app instance density per host
+**Purpose:** Use larger VMs for workloads where bin-packing efficiency outweighs fault isolation concerns
 
 ```bash
-cf create-isolation-segment high-density
+cf create-isolation-segment large-cell
 ```
 
 **BOSH Configuration:**
@@ -243,21 +309,21 @@ cf create-isolation-segment high-cpu
 
 ```bash
 # Step 1: Create new org/space for testing
-cf create-space high-density-test -o production-org
+cf create-space large-cell-test -o production-org
 
 # Step 2: Entitle org to use new segment
-cf enable-org-isolation production-org high-density
+cf enable-org-isolation production-org large-cell
 
 # Step 3: Assign test space to segment
-cf set-space-isolation-segment high-density-test high-density
+cf set-space-isolation-segment large-cell-test large-cell
 
 # Step 4: Push test application
-cf target -s high-density-test
+cf target -s large-cell-test
 cf push test-app
 
 # Step 5: Validate
 cf app test-app
-# Verify: isolation segment: high-density
+# Verify: isolation segment: large-cell
 
 # Step 6: Performance testing
 # - Load testing
@@ -273,7 +339,7 @@ cf app test-app
 # Examples: internal tools, non-critical services, background workers
 
 # Migrate pilot apps
-cf set-space-isolation-segment internal-tools-space high-density
+cf set-space-isolation-segment internal-tools-space large-cell
 cf restart app1
 cf restart app2
 
@@ -288,15 +354,15 @@ cf restart app2
 
 ```bash
 # Wave 1: 25% of production apps (Month 2)
-cf set-space-isolation-segment batch1-space high-density
+cf set-space-isolation-segment batch1-space large-cell
 # Restart apps in batches, monitor each batch
 
 # Wave 2: 25% of production apps (Month 3)
-cf set-space-isolation-segment batch2-space high-density
+cf set-space-isolation-segment batch2-space large-cell
 # Restart apps in batches, monitor each batch
 
 # Wave 3: 25% of production apps (Month 4)
-cf set-space-isolation-segment batch3-space high-density
+cf set-space-isolation-segment batch3-space large-cell
 # Restart apps in batches, monitor each batch
 
 # Wave 4: Remaining apps (Month 5+)
@@ -453,16 +519,16 @@ cf restart analytics-app
 - vCPU: 470 × 4 = 1,880 vCPU
 - Memory: 470 × 32GB = 15,040 GB
 
-### Optimized State: High-Density Segment
+### Optimized State: Large-Cell Segment
 
-**Scenario:** Deploy high-density segment for 50% of apps
+**Scenario:** Deploy large-cell segment for 50% of apps
 
 #### Infrastructure Changes
 
 **Deploy New Segment:**
 
 - Add 120 Diego cells at **8/64** (8 vCPU, 64GB RAM)
-- Placement tag: `high-density`
+- Placement tag: `large-cell`
 
 **New Segment Capacity:**
 
@@ -484,7 +550,7 @@ cf restart analytics-app
 
 **With Optimization (50% on 8/64 cells):**
 
-- 3,750 app instances on high-density segment
+- 3,750 app instances on large-cell segment
 - 3,750 GB / 60GB usable per 8/64 cell ≈ 63 cells
 - 3,750 app instances on shared segment: ~80 cells (4/32)
 - **Total: ~143 cells vs 160 cells = 11% reduction**
@@ -500,7 +566,7 @@ cf restart analytics-app
 
 **Month 1: Deploy Infrastructure**
 
-- Deploy 120 cells in high-density segment
+- Deploy 120 cells in large-cell segment
 - Configure BOSH placement tags
 - Register segment in Cloud Controller
 - Test with pilot apps
@@ -527,7 +593,7 @@ cf restart analytics-app
 
 #### Per-Segment Capacity Checks
 
-**Note:** For tile-based deployments, BOSH deployment names are generated by Ops Manager (e.g., `cf-abc123def456` and `p-isolation-segment-xyz789abc`), not simple names like `cf` or `high-density`.
+**Note:** For tile-based deployments, BOSH deployment names are generated by Ops Manager (e.g., `cf-abc123def456` and `p-isolation-segment-xyz789abc`), not simple names like `cf` or `large-cell`.
 
 ```bash
 # Find deployment names
@@ -563,8 +629,8 @@ bosh -e ENV -d "$ISO_DEPLOYMENT" ssh isolated_diego_cell/0 \
 # All cells in shared segment
 bosh -e ENV -d cf instances --details | grep diego_cell
 
-# All cells in high-density segment
-bosh -e ENV -d high-density instances --details | grep diego_cell
+# All cells in large-cell segment
+bosh -e ENV -d large-cell instances --details | grep diego_cell
 ```
 
 ### Application Performance Comparison
@@ -589,7 +655,7 @@ cf logs myapp --recent | grep "response_time"
 ```bash
 # Verify segment assignment
 cf app myapp
-# Shows: isolation segment: high-density
+# Shows: isolation segment: large-cell
 
 # Compare metrics
 cf app myapp
@@ -615,13 +681,13 @@ cf events myapp
 
 ```bash
 # Cloud Controller API: Apps per segment
-cf curl "/v3/apps?isolation_segment_guids=$(cf isolation-segment high-density --guid)" \
+cf curl "/v3/apps?isolation_segment_guids=$(cf isolation-segment large-cell --guid)" \
   | jq '.pagination.total_results'
 
 # Diego cell utilization across segment
 for i in {0..9}; do
   echo "Cell diego_cell/$i:"
-  bosh -e ENV -d high-density ssh diego_cell/$i \
+  bosh -e ENV -d large-cell ssh diego_cell/$i \
     -c "curl -s localhost:1800/state | jq '.AvailableResources.MemoryMB'"
 done
 ```
@@ -692,9 +758,9 @@ cf app APP-NAME
 
 ```bash
 # Scale up Diego cells in segment
-bosh -e ENV -d high-density manifest > manifest.yml
+bosh -e ENV -d large-cell manifest > manifest.yml
 # Edit manifest: increase diego_cell instance count
-bosh -e ENV -d high-density deploy manifest.yml
+bosh -e ENV -d large-cell deploy manifest.yml
 ```
 
 **Option B: Move some apps to different segment**
@@ -729,14 +795,14 @@ done
 
 ```bash
 # Check BOSH deployment health
-bosh -e ENV -d high-density vms --vitals
-bosh -e ENV -d high-density instances --ps
+bosh -e ENV -d large-cell vms --vitals
+bosh -e ENV -d large-cell instances --ps
 
 # Check specific cell health
-bosh -e ENV -d high-density ssh diego_cell/0 -c "monit summary"
+bosh -e ENV -d large-cell ssh diego_cell/0 -c "monit summary"
 
 # If segment is unhealthy, move all apps off
-cf curl /v3/apps?isolation_segment_guids=$(cf isolation-segment high-density --guid) \
+cf curl /v3/apps?isolation_segment_guids=$(cf isolation-segment large-cell --guid) \
   | jq -r '.resources[].name' > apps.txt
 
 # For each app, move to shared
@@ -771,7 +837,7 @@ done < apps.txt
 
 #### ✅ Phase 2: Create Optimized Segments
 
-- Define segment strategy (high-density, high-performance, etc.)
+- Define segment strategy (large-cell, high-performance, etc.)
 - Deploy Diego cells with placement tags
 - Configure cell sizes based on workload requirements
 - **Impact:** Infrastructure addition only
@@ -861,3 +927,11 @@ done < apps.txt
 This is the **lowest-impact approach** for improving performance and app instance density while maintaining full operational flexibility and easy rollback options.
 
 The gradual opt-in migration model ensures existing production workloads remain unaffected while new optimized segments are validated and proven before broad adoption.
+
+---
+
+## See Also
+
+- **[Deployment Workflow Guide](isolation-segment-deployment-workflow.md)** - Step-by-step instructions for replicating, installing, and configuring multiple isolation segments
+- **[Tile Migration Script](scripts/isolation-segment-tile-migration.sh)** - Automation for tile management
+- **[Broadcom TechDocs: Installing Isolation Segments](https://techdocs.broadcom.com/us/en/vmware-tanzu/platform/elastic-application-runtime/6-0/eart/installing-pcf-is.html)**
