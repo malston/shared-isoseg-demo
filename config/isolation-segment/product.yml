@@ -1,3 +1,5 @@
+# ABOUTME: Ops Manager product configuration template for isolation segments
+# ABOUTME: Used with om configure-product --config and --vars-file options
 product-name: p-isolation-segment
 network-properties:
   network:
@@ -7,28 +9,6 @@ network-properties:
   singleton_availability_zone:
     name: ((singleton_availability_zone))
 product-properties:
-  .isolated_router.disable_insecure_cookies:
-    value: ((isolated_router_disable_insecure_cookies))
-  .isolated_router.drain_timeout:
-    value: ((isolated_router_drain_timeout))
-  .isolated_router.drain_wait:
-    value: ((isolated_router_drain_wait))
-  .isolated_router.enable_nontls_health_checks:
-    value: ((isolated_router_enable_nontls_health_checks))
-  .isolated_router.enable_w3c:
-    value: ((isolated_router_enable_w3c))
-  .isolated_router.enable_write_access_logs:
-    value: ((isolated_router_enable_write_access_logs))
-  .isolated_router.enable_zipkin:
-    value: ((isolated_router_enable_zipkin))
-  .isolated_router.http_2_request_timeout_in_seconds:
-    value: ((isolated_router_http_2_request_timeout_in_seconds))
-  .isolated_router.lb_healthy_threshold:
-    value: ((isolated_router_lb_healthy_threshold))
-  .isolated_router.max_header_kb:
-    value: ((isolated_router_max_header_kb))
-  .isolated_router.request_timeout_in_seconds:
-    value: ((isolated_router_request_timeout_in_seconds))
   .properties.app_graceful_shutdown_period_in_seconds:
     value: ((app_graceful_shutdown_period_in_seconds))
   .properties.app_log_rate_limiting:

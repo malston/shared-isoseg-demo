@@ -1,3 +1,7 @@
+# ABOUTME: Default variable values for isolation segment configuration
+# ABOUTME: These apply to all segments; override in segment-specific vars files
+
+# Diego cell configuration
 app_graceful_shutdown_period_in_seconds: 10
 enable_container_network_metrics: false
 enable_cpu_throttling: false
@@ -5,23 +9,18 @@ enable_garden_containerd_mode: true
 enable_silk_policy_enforcement: true
 enable_smb_volume_driver: true
 garden_disk_cleanup_reserved_reserved_space_for_other_jobs_in_mb: 15360
-gorouter_ssl_ciphers: ECDHE-RSA-AES128-GCM-SHA256:TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
-isolated_router_disable_insecure_cookies: false
-isolated_router_drain_timeout: 900
-isolated_router_drain_wait: 20
-isolated_router_enable_nontls_health_checks: true
-isolated_router_enable_w3c: false
-isolated_router_enable_write_access_logs: true
-isolated_router_enable_zipkin: true
-isolated_router_http_2_request_timeout_in_seconds: 0
-isolated_router_lb_healthy_threshold: 20
-isolated_router_max_header_kb: 48
-isolated_router_request_timeout_in_seconds: 900
+
+# Network policy
 policy_enforcement_poll_interval: 5
+
+# Route services
 route_services_internal_lookup: false
 route_services_internal_server_port: 7070
+
+# Routing (applies when using shared routing via TAS gorouters)
+routing_disable_http: false
+gorouter_ssl_ciphers: ECDHE-RSA-AES128-GCM-SHA256:TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
 router_backend_max_conn: 500
 router_enable_log_attempt_details: false
 router_enable_proxy: false
 router_sticky_sessions_for_auth_negotiate: true
-routing_disable_http: false

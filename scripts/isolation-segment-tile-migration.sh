@@ -934,10 +934,30 @@ configure_segment() {
     # Build the om configure-product command
     info "Running om configure-product..."
 
-    # Create a temporary product.yml with the correct product name
+    # Create a temporary product.yml with the correct product name and job names
     local temp_product_yml
     temp_product_yml=$(mktemp)
-    sed "s/^product-name: .*/product-name: ${product_name}/" "$product_yml" > "$temp_product_yml"
+
+    # Extract segment name from product name (e.g., p-isolation-segment-small-cell -> small-cell)
+    local segment_name=""
+    local segment_name_underscored=""
+    if [[ "$product_name" =~ ^p-isolation-segment-(.+)$ ]]; then
+        segment_name="${BASH_REMATCH[1]}"
+        # Job names use underscores instead of hyphens (e.g., small_cell not small-cell)
+        segment_name_underscored="${segment_name//-/_}"
+        debug "Detected segment name: $segment_name (job suffix: $segment_name_underscored)"
+    fi
+
+    # For replicated tiles, job names have the segment name appended with underscores
+    # e.g., isolated_diego_cell_small_cell, isolated_router_small_cell
+    if [[ -n "$segment_name_underscored" ]]; then
+        sed -e "s/^product-name: .*/product-name: ${product_name}/" \
+            -e "s/isolated_diego_cell:/isolated_diego_cell_${segment_name_underscored}:/" \
+            -e "s/isolated_router:/isolated_router_${segment_name_underscored}:/" \
+            "$product_yml" > "$temp_product_yml"
+    else
+        sed "s/^product-name: .*/product-name: ${product_name}/" "$product_yml" > "$temp_product_yml"
+    fi
 
     # Build vars file arguments
     local vars_args=("--vars-file" "$default_vars" "--vars-file" "$vars_file")
