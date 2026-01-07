@@ -1,17 +1,17 @@
-# Shared Isolation Segments for Performance and Density
+# Shared Isolation Segments for Cloud Foundry
 
-**Objective:** Use Cloud Foundry isolation segments with shared routing to improve application performance and Diego cell density with minimal operational impact.
+**Objective:** Demonstrate how to use Cloud Foundry isolation segments with shared routing to isolate workloads transparently—with zero impact to developers, pipelines, or network infrastructure.
 
 ## Overview
 
 This guide demonstrates how to leverage isolation segments to:
 
-- **Improve performance** by eliminating noisy neighbors (dedicated Diego cells)
-- **Increase density** by deploying larger cells with better bin-packing efficiency
-- **Minimize impact** by using shared routing (no network infrastructure changes)
-- **Enable gradual migration** with easy rollback capabilities
+- **Isolate workloads** on dedicated Diego cells without disrupting existing apps
+- **Zero developer impact** - same `cf push`, same routes, same pipelines
+- **No network changes** - shared routing means no new load balancers, DNS, or certificates
+- **Gradual migration** - move workloads incrementally with easy rollback
 
-**Key Benefit:** Compute isolation without network isolation = maximum performance and density gains with minimal operational complexity.
+**Key Benefit:** Compute isolation without network isolation = workload separation with operational simplicity.
 
 ### Zero Impact to Developers and Pipelines
 
