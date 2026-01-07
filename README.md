@@ -1,6 +1,6 @@
 # Shared Isolation Segments for Cloud Foundry
 
-**Objective:** Demonstrate how to use Cloud Foundry isolation segments with shared routing to isolate workloads transparently—with zero impact to developers, pipelines, or network infrastructure.
+**Objective:** Demonstrate how to use Cloud Foundry isolation segments with shared routing to isolate workloads transparently, with zero impact to developers, pipelines, or network infrastructure.
 
 ## Overview
 
