@@ -1,0 +1,35 @@
+# ABOUTME: Vars file for medium-cell isolation segment
+# ABOUTME: Uses official config template with ops files for feature configuration
+
+# Usage: om configure-product \
+#   --config base-config.yml \
+#   --vars-file medium-cell-vars.yml \
+#   --vars-file secrets/ssl-certs.yml
+
+# Network configuration
+network_name: tas-Deployment
+singleton_availability_zone: az2
+other_availability_zones:
+- name: az1
+- name: az2
+
+# SSL certificate name (cert/key values in secrets/ssl-certs.yml)
+networking_poe_ssl_certs_0_name: medium-cell
+
+# Feature: compute_isolation (ops file variable)
+compute_isolation_enabled_isolation_segment_name: medium-cell
+
+# Feature: routing_table_sharding_mode (ops file variable)
+routing_table_sharding_mode_isolation_segment_list_names:
+- medium-cell
+
+# Resource configuration
+resource-var-isolated_diego_cell_instances: 5
+resource-var-isolated_diego_cell_instance_type: medium.disk
+resource-var-isolated_diego_cell_max_in_flight: 4%
+resource-var-isolated_router_instances: 0
+resource-var-isolated_router_instance_type: automatic
+resource-var-isolated_router_max_in_flight: 1
+
+# Errand configuration
+smoke_tests_isolation_post_deploy_state: true

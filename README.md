@@ -1,17 +1,17 @@
-# Shared Isolation Segments for Performance and Density
+# Shared Isolation Segments for Cloud Foundry
 
-**Objective:** Use Cloud Foundry isolation segments with shared routing to improve application performance and Diego cell density with minimal operational impact.
+**Objective:** Demonstrate how to use Cloud Foundry isolation segments with shared routing to isolate workloads transparently, with zero impact to developers, pipelines, or network infrastructure.
 
 ## Overview
 
 This guide demonstrates how to leverage isolation segments to:
 
-- **Improve performance** by eliminating noisy neighbors (dedicated Diego cells)
-- **Increase density** by deploying larger cells with better bin-packing efficiency
-- **Minimize impact** by using shared routing (no network infrastructure changes)
-- **Enable gradual migration** with easy rollback capabilities
+- **Isolate workloads** on dedicated Diego cells without disrupting existing apps
+- **Zero developer impact** - same `cf push`, same routes, same pipelines
+- **No network changes** - shared routing means no new load balancers, DNS, or certificates
+- **Gradual migration** - move workloads incrementally with easy rollback
 
-**Key Benefit:** Compute isolation without network isolation = maximum performance and density gains with minimal operational complexity.
+**Key Benefit:** Compute isolation without network isolation = workload separation with operational simplicity.
 
 ### Zero Impact to Developers and Pipelines
 
@@ -21,7 +21,7 @@ Simply assign a space to an isolation segment and restart apps - developers and 
 
 ```bash
 # Platform operator
-cf set-space-isolation-segment production-space high-density
+cf set-space-isolation-segment production-space large-cell
 cf restart app-name
 
 # Developer/Pipeline - NO CHANGES NEEDED
@@ -38,12 +38,21 @@ Same space names, same routes, same URLs, same `cf push` commands. Zero coordina
 **[isolation-segments-performance-density.md](./isolation-segments-performance-density.md)**
 
 - Comprehensive implementation guide
-- Segment strategy examples (high-density, high-performance, high-memory, high-CPU)
+- Segment strategy examples (large-cell, high-performance, high-memory, high-CPU)
+- Density trade-offs and right-sizing guidance
 - Gradual migration methodology with zero downtime
 - Capacity planning calculations and examples
 - Monitoring best practices
 - Rollback procedures
 - Complete implementation roadmap
+
+**[isolation-segment-deployment-workflow.md](./isolation-segment-deployment-workflow.md)**
+
+- Step-by-step deployment workflow for multiple isolation segments
+- Replicator tool usage and tile replication
+- Configuration file examples with all required properties
+- Troubleshooting guide for common issues (job naming, property errors)
+- Quick reference commands
 
 ### 🔧 Automation Scripts
 
@@ -53,9 +62,9 @@ Same space names, same routes, same URLs, same `cf push` commands. Zero coordina
 
 - Official Isolation Segment tile installation via Ops Manager
 - **SUPPORTED by Broadcom** for production use
-- Commands: `install-tile`, `configure-segment`, `register-segment`
-- Requires: `om` CLI and Ops Manager credentials
-- Environment variables: `OM_TARGET`, `OM_USERNAME`, `OM_PASSWORD`
+- Commands: `download-tile`, `download-replicator`, `replicate-tile`, `configure-segment`, `register-segment`
+- Requires: `om` CLI, `pivnet` CLI, and Ops Manager credentials
+- Environment variables: `OM_TARGET`, `OM_USERNAME`, `OM_PASSWORD`, `PIVNET_API_TOKEN`
 
 #### isolation-segment-migration.sh (TESTING ONLY)
 
@@ -67,6 +76,41 @@ Same space names, same routes, same URLs, same `cf push` commands. Zero coordina
 - Faster for quick testing but lacks production support
 - Requires: BOSH Director access
 - Environment variables: `BOSH_ENVIRONMENT`, `BOSH_CLIENT`, `BOSH_CLIENT_SECRET`
+
+#### demo-isolation-segment-migration.sh (Demonstrations)
+
+**[demo-isolation-segment-migration.sh](./scripts/demo-isolation-segment-migration.sh)** - **For demos and presentations**
+
+- Interactive demonstration of zero-impact workload migration
+- **Single-segment mode:** Migrate one app from shared cells to an isolation segment
+- **Dual-segment mode:** Deploy two apps to two different segments for side-by-side comparison
+- Includes before/after state capture and comparison display
+- Auto-cleanup option for repeatable demos
+
+```bash
+# Single-segment demo (default)
+./scripts/demo-isolation-segment-migration.sh --interactive
+
+# Dual-segment demo (two apps, two segments)
+./scripts/demo-isolation-segment-migration.sh --dual-segment --automated --cleanup
+```
+
+### 📁 Configuration Files
+
+**[config/isolation-segment/](./config/isolation-segment/)** - Pre-configured vars files for different cell sizes
+
+- `small-cell-vars.yml` - 3 Diego cells, medium.disk instance type
+- `medium-cell-vars.yml` - 5 Diego cells, medium.disk instance type
+- `large-cell-vars.yml` - 10 Diego cells, automatic instance type
+- `secrets/ssl-certs.yml` - SSL certificate/key values (gitignored)
+
+### 📱 Demo Applications
+
+**[apps/cf-env/](./apps/cf-env/)** - Lightweight Go app for dual-segment demos
+
+- Displays CF environment variables (CF_INSTANCE_IP, etc.)
+- 64MB memory footprint
+- Used to demonstrate workload differentiation between segments
 
 ## Quick Start
 
@@ -96,20 +140,32 @@ cf target
 
 ### 3. Create an Isolation Segment
 
+**For detailed workflow, see [isolation-segment-deployment-workflow.md](./isolation-segment-deployment-workflow.md)**
+
 **Production (Tile-based - SUPPORTED):**
 
 ```bash
-# Install tile
-./scripts/isolation-segment-tile-migration.sh install-tile \
-  --tile-path ~/Downloads/isolation-segment-6.0.x.pivotal
+# Download replicator tool (for multiple segments)
+./scripts/isolation-segment-tile-migration.sh download-replicator --version '10.2.5+LTS-T'
 
-# Configure via Ops Manager UI or:
+# Replicate tile for each segment
+/tmp/replicator -name small-cell -path p-isolation-segment-10.2.5.pivotal \
+    -output small-cell-10.2.5.pivotal
+
+# Upload and stage tile
+om upload-product --product small-cell-10.2.5.pivotal
+om stage-product --product-name p-isolation-segment-small-cell --product-version 10.2.5
+
+# Configure using the migration script (auto-detects secrets)
 ./scripts/isolation-segment-tile-migration.sh configure-segment \
-  --name high-density \
-  --cell-count 120
+    --product p-isolation-segment-small-cell \
+    --vars-file config/isolation-segment/small-cell-vars.yml
 
-# Apply changes in Ops Manager, then register
-./scripts/isolation-segment-tile-migration.sh register-segment --name high-density
+# Apply changes in Ops Manager
+om apply-changes --product-name p-isolation-segment-small-cell
+
+# Register segment in Cloud Controller
+./scripts/isolation-segment-tile-migration.sh register-segment --name small-cell
 ```
 
 **Testing only (BOSH direct - NOT SUPPORTED):**
@@ -130,7 +186,7 @@ cf target
 ./scripts/isolation-segment-migration.sh migrate \
   --org production-org \
   --space prod-space \
-  --segment high-density \
+  --segment small-cell \
   --entitle \
   --dry-run
 
@@ -138,7 +194,7 @@ cf target
 ./scripts/isolation-segment-migration.sh migrate \
   --org production-org \
   --space prod-space \
-  --segment high-density \
+  --segment small-cell \
   --entitle \
   --batch-size 10 \
   --delay 30
@@ -148,13 +204,13 @@ cf target
 
 ```bash
 # One-time capacity check
-./scripts/isolation-segment-migration.sh monitor --segment high-density
+./scripts/isolation-segment-migration.sh monitor --segment large-cell
 
 # Real-time monitoring (refresh every 10 seconds)
-./scripts/isolation-segment-migration.sh monitor --segment high-density --watch 10
+./scripts/isolation-segment-migration.sh monitor --segment large-cell --watch 10
 
 # Export metrics as JSON
-./scripts/isolation-segment-migration.sh monitor --segment high-density --output json
+./scripts/isolation-segment-migration.sh monitor --segment large-cell --output json
 ```
 
 ### 6. Rollback if Needed
@@ -184,7 +240,7 @@ cf target
 
 **Network path:**
 
-```
+```text
 Client → Existing LB → TAS Gorouter → App (Shared or Isolation Segment Diego Cell)
                                             ↑
                                        Only this changes
@@ -200,7 +256,7 @@ Client → Existing LB → TAS Gorouter → App (Shared or Isolation Segment Die
 
 | Segment Type | Cell Size | Best For |
 |--------------|-----------|----------|
-| **High-Density** | 8/64 (8 vCPU, 64GB) | Microservices, web apps, background workers |
+| **Large-Cell** | 8/64 (8 vCPU, 64GB) | Microservices, web apps, background workers |
 | **High-Performance** | 4/32 (4 vCPU, 32GB) | Production apps, strict SLAs, revenue-critical |
 | **High-Memory** | 4/128 (4 vCPU, 128GB) | Analytics, data processing, large Java apps |
 | **High-CPU** | 8/32 (8 vCPU, 32GB) | Image/video processing, ML inference, compute-heavy |
