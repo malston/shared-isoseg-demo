@@ -22,17 +22,17 @@ WARN=0
 
 check_pass() {
     echo -e "  ${GREEN}✓${NC} $1"
-    ((PASS++))
+    ((PASS++)) || true
 }
 
 check_fail() {
     echo -e "  ${RED}✗${NC} $1"
-    ((FAIL++))
+    ((FAIL++)) || true
 }
 
 check_warn() {
     echo -e "  ${YELLOW}⚠${NC} $1"
-    ((WARN++))
+    ((WARN++)) || true
 }
 
 check_info() {
@@ -54,15 +54,15 @@ check_cli_tools() {
     # Required tools
     for cmd in cf om pivnet jq bosh; do
         if command -v "$cmd" &> /dev/null; then
-            local version
+            local version=""
             case "$cmd" in
-                cf)    version=$(cf version 2>/dev/null | head -1) ;;
-                om)    version=$(om version 2>/dev/null) ;;
-                pivnet) version=$(pivnet --version 2>/dev/null) ;;
-                jq)    version=$(jq --version 2>/dev/null) ;;
-                bosh)  version=$(bosh --version 2>/dev/null | head -1) ;;
+                cf)    version=$(cf version 2>/dev/null | head -1 || echo "unknown") ;;
+                om)    version=$(om version 2>/dev/null || echo "unknown") ;;
+                pivnet) version=$(pivnet --version 2>/dev/null || echo "unknown") ;;
+                jq)    version=$(jq --version 2>/dev/null || echo "unknown") ;;
+                bosh)  version=$(bosh --version 2>/dev/null | head -1 || echo "unknown") ;;
             esac
-            check_pass "$cmd: $version"
+            check_pass "$cmd: ${version:-available}"
         else
             check_fail "$cmd: not found"
         fi
@@ -139,14 +139,15 @@ check_cf_connection() {
     section "Cloud Foundry Connection"
 
     if cf target &> /dev/null; then
-        local api org space
-        api=$(cf target | grep "API endpoint" | awk '{print $3}')
-        org=$(cf target | grep "org:" | awk '{print $2}')
-        space=$(cf target | grep "space:" | awk '{print $2}')
+        local api org space target_output
+        target_output=$(cf target 2>/dev/null || echo "")
+        api=$(echo "$target_output" | grep -i "api endpoint" | awk '{print $NF}' || echo "unknown")
+        org=$(echo "$target_output" | grep -i "^org:" | awk '{print $2}' || echo "unknown")
+        space=$(echo "$target_output" | grep -i "^space:" | awk '{print $2}' || echo "unknown")
 
-        check_pass "CF API: $api"
-        check_pass "Org: $org"
-        check_pass "Space: $space"
+        check_pass "CF API: ${api:-unknown}"
+        check_pass "Org: ${org:-not targeted}"
+        check_pass "Space: ${space:-not targeted}"
     else
         check_fail "Not logged into Cloud Foundry"
         check_info "Run: cf login -a <API_URL>"
@@ -177,17 +178,19 @@ check_demo_prerequisites() {
     # Check Spring Music is deployed
     if cf target -o demo-org -s dev-space &> /dev/null 2>&1; then
         if cf app spring-music &> /dev/null 2>&1; then
-            local state
-            state=$(cf app spring-music | grep "state:" | awk '{print $2}' || echo "unknown")
+            local state=""
+            state=$(cf app spring-music 2>/dev/null | grep -i "state:" | awk '{print $2}') || state="unknown"
             if [[ "$state" == "started" ]]; then
                 check_pass "Spring Music app running in dev-space"
             else
-                check_warn "Spring Music app exists but state is: $state"
+                check_warn "Spring Music app exists but state is: ${state:-unknown}"
             fi
         else
             check_fail "Spring Music app not found in dev-space"
             check_info "Deploy with: cf push spring-music (from spring-music directory)"
         fi
+    else
+        check_warn "Could not target demo-org/dev-space to check Spring Music"
     fi
 
     # Check cf-env app is built
@@ -206,9 +209,9 @@ check_tile_files() {
     local download_dir="${HOME}/Downloads"
 
     # Check for isolation segment tile
-    if ls "$download_dir"/p-isolation-segment-*.pivotal &> /dev/null 2>&1; then
-        local tile
-        tile=$(ls -t "$download_dir"/p-isolation-segment-*.pivotal 2>/dev/null | head -1)
+    local tile=""
+    tile=$(find "$download_dir" -maxdepth 1 -name "p-isolation-segment-*.pivotal" -type f 2>/dev/null | head -1) || true
+    if [[ -n "$tile" ]]; then
         check_pass "Isolation segment tile: $(basename "$tile")"
     else
         check_info "No isolation segment tile in $download_dir"
