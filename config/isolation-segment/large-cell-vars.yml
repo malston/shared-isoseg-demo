@@ -24,7 +24,7 @@ routing_table_sharding_mode_isolation_segment_list_names:
 - large-cell
 
 # Resource configuration
-resource-var-isolated_diego_cell_instances: 10
+resource-var-isolated_diego_cell_instances: 1
 resource-var-isolated_diego_cell_instance_type: automatic
 resource-var-isolated_diego_cell_max_in_flight: 4%
 resource-var-isolated_router_instances: 0
