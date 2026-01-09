@@ -165,15 +165,20 @@ check_demo_prerequisites() {
         check_info "Create with: cf create-org demo-org"
     fi
 
-    # Check spaces exist
-    for space in dev-space iso-validation; do
-        if cf space "$space" -o demo-org &> /dev/null 2>&1; then
-            check_pass "Space '$space' exists in demo-org"
-        else
-            check_fail "Space '$space' not found in demo-org"
-            check_info "Create with: cf create-space $space -o demo-org"
-        fi
-    done
+    # Check spaces exist (need to target org first)
+    # Target demo-org to check spaces
+    if cf target -o demo-org &> /dev/null 2>&1; then
+        for space in dev-space iso-validation; do
+            if cf space "$space" &> /dev/null 2>&1; then
+                check_pass "Space '$space' exists in demo-org"
+            else
+                check_fail "Space '$space' not found in demo-org"
+                check_info "Create with: cf create-space $space -o demo-org"
+            fi
+        done
+    else
+        check_warn "Could not target demo-org to check spaces"
+    fi
 
     # Check Spring Music is deployed
     if cf target -o demo-org -s dev-space &> /dev/null 2>&1; then
