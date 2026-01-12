@@ -6,30 +6,36 @@
 ## Pre-Recording Checklist
 
 ### Environment Requirements
+
 - [ ] TAS foundation with Ops Manager accessible
 - [ ] At least 1 Diego cell available for isolation segment
 - [ ] Network connectivity to Broadcom Support Portal
 
 ### CLI Tools Configured
+
 - [ ] `om` CLI authenticated (OM_TARGET, OM_USERNAME, OM_PASSWORD exported)
 - [ ] `cf` CLI authenticated (`cf login` completed)
 - [ ] `pivnet` CLI available with PIVNET_TOKEN set
 - [ ] `jq` installed for JSON parsing
 
 ### Pre-Recording Setup
+
 - [ ] Spring Music deployed to shared space (`cf push spring-music`)
 - [ ] cf-env app built and ready (`cd apps/cf-env && go build`)
 - [ ] Demo org and spaces created:
+
   ```bash
   cf create-org demo-org
   cf create-space dev-space -o demo-org      # Developer's existing space
   cf create-space iso-validation -o demo-org  # Operator's test space
   ```
+
 - [ ] Terminal font size readable (14-16pt recommended)
 - [ ] Browser logged into Ops Manager, zoom 100-110%
 - [ ] Screen recording software ready
 
 ### Credential Management
+
 - [ ] All credentials in environment variables (no typing passwords on camera)
 - [ ] `.envrc` or equivalent sourced with OM_*, CF_*, PIVNET_TOKEN
 
@@ -119,6 +125,7 @@ om stage-product \
 **[BROWSER]** Click on the tile to open configuration
 
 Walk through key configuration sections:
+
 1. **Assign AZs and Networks** - Show AZ selection
 2. **Isolated Diego Cells** - Point out cell count (1 for lab)
 3. **Networking** - Note: 0 routers (shared routing mode)
@@ -219,35 +226,23 @@ cd ../..
 cf app cf-env-test
 
 # Get the app URL
-cf app cf-env-test | grep routes
+cf routes
 ```
 
 **[BROWSER]** Open app URL to show it's responding
 
-#### 1.4.3 - Full 4-Layer Verification
+#### 1.4.3 - Verify App Running on Isolated Cell
 
 ```bash
-# Run the demo script's verification (captures comprehensive state)
-./scripts/demo-isolation-segment-migration.sh --capture-state cf-env-test
-```
-
-Or manually verify each layer:
-
-```bash
-# Layer 1: CF CLI - Isolation segment visible
+# Verify space shows isolation segment
 cf space iso-validation
 
-# Layer 2: BOSH - Cell placement
-bosh -d p-isolation-segment-large-cell-* instances
-
-# Layer 3: Diego - Cell metrics
-cf curl /v3/apps/$(cf app cf-env-test --guid)/processes | jq '.resources[0].instances'
-
-# Layer 4: App environment
-curl -s "https://$(cf app cf-env-test | grep routes | awk '{print $2}')/env" | jq '.CF_INSTANCE_IP'
+# Compare app host IP with isolated Diego cell IP
+echo "App running on: $(curl -s "https://$(cf app cf-env-test | grep routes | awk '{print $2}')/env" | grep CF_INSTANCE_IP | cut -d= -f2)"
+echo "Large-cell Diego: $(bosh -d p-isolation-segment-large-cell-2ce92833ad1ce8f6e40a instances --json 2>/dev/null | jq -r '.Tables[0].Rows[0].ips')"
 ```
 
-> **Narration cue**: "Four-layer verification confirms: CF sees the segment, BOSH deployed the cell, Diego scheduled the app, and the app is running on the isolated cell."
+> **Narration cue**: "We verify the app is running on the isolated cell by comparing the instance IP with the Diego cell IP. They match - the app is on the large-cell segment."
 
 #### 1.4.4 - Segment Ready Declaration
 
@@ -474,11 +469,13 @@ cf delete-isolation-segment large-cell -f
 ## Recording Notes
 
 ### Cuts
+
 - **[CUT]**: Stop recording at this point
 - **[RESUME]**: Start recording again
 - **[BROWSER]**: Switch to browser view
 
 ### Timing Markers
+
 - Add chapter markers at each Scene start
 - Note timestamp at each [CUT] for editing reference
 
