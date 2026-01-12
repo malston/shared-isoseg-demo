@@ -28,6 +28,7 @@
     "security-scanning@claude-code-workflows": false,
     "shell-scripting@claude-code-workflows": false,
     "tdd-workflows@claude-code-workflows": false,
-    "unit-testing@claude-code-workflows": false
+    "unit-testing@claude-code-workflows": false,
+    "voicemode@mbailey": true
   }
 }
