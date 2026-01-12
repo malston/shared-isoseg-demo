@@ -416,22 +416,34 @@ download_replicator() {
         fatal "Failed to login to Pivnet. Check PIVNET_TOKEN."
     fi
 
-    # Get the Replicator product file ID for this release
+    # Verify the release exists before trying to find files
     info "Finding Replicator file ID for release $version..."
-    local file_id
-    file_id=$(pivnet product-files \
+    local release_check
+    if ! release_check=$(pivnet product-files \
         --product-slug='p-isolation-segment' \
         --release-version="$version" \
-        --format='json' 2>/dev/null | jq -r '.[] | select(.name=="Replicator") | .id')
+        --format='json' 2>&1); then
+        if echo "$release_check" | grep -q "release not found"; then
+            error "Release '$version' not found"
+            info ""
+            info "Available releases (showing recent):"
+            pivnet releases --product-slug='p-isolation-segment' 2>/dev/null | head -15
+            info ""
+            info "Use full version string, e.g., --version '10.2.5+LTS-T'"
+            fatal "Invalid release version: $version"
+        else
+            fatal "Pivnet error: $release_check"
+        fi
+    fi
+
+    local file_id
+    file_id=$(echo "$release_check" | jq -r '.[] | select(.name=="Replicator") | .id')
 
     if [[ -z "$file_id" || "$file_id" == "null" ]]; then
         error "Could not find Replicator file for release $version"
         info ""
-        info "List available releases with:"
-        info "  pivnet releases --product-slug='p-isolation-segment'"
-        info ""
-        info "Then check files for a specific release:"
-        info "  pivnet product-files --product-slug='p-isolation-segment' --release-version='VERSION'"
+        info "Files in this release:"
+        echo "$release_check" | jq -r '.[].name'
         fatal "Replicator not found in release $version"
     fi
 
