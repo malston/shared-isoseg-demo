@@ -252,7 +252,28 @@ echo "Changes to deployment process: NONE"' "Closing summary"
 # Main Menu
 # ============================================================================
 
+cleanup_demo() {
+    echo ""
+    echo -e "${YELLOW}Cleaning up demo environment...${NC}"
+    echo ""
+    cf delete cf-env-test -f 2>/dev/null || true
+    cf reset-space-isolation-segment dev-space 2>/dev/null || true
+    cf reset-space-isolation-segment iso-validation 2>/dev/null || true
+    cf disable-org-isolation demo-org large-cell 2>/dev/null || true
+    cf delete-isolation-segment large-cell -f 2>/dev/null || true
+    rm -f ~/Downloads/p-isolation-segment-large-cell-10.2.5.pivotal
+    echo ""
+    echo -e "${GREEN}✓ Demo environment reset${NC}"
+    echo ""
+}
+
 main_menu() {
+    # Handle --cleanup flag
+    if [[ "${1:-}" == "--cleanup" ]]; then
+        cleanup_demo
+        exit 0
+    fi
+
     echo ""
     echo -e "${GREEN}╔════════════════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║       Isolation Segments Demo Recording Driver                         ║${NC}"
@@ -292,4 +313,4 @@ main_menu() {
     esac
 }
 
-main_menu
+main_menu "$@"
