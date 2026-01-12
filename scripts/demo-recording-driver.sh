@@ -259,6 +259,8 @@ cleanup_demo() {
     echo ""
     echo -e "${YELLOW}Cleaning up demo environment...${NC}"
     echo ""
+
+    echo "Cleaning up CF resources..."
     cf target -o demo-org -s dev-space 2>/dev/null || true
     cf delete cf-env-test -f 2>/dev/null || true
     cf reset-space-isolation-segment dev-space 2>/dev/null || true
@@ -267,6 +269,25 @@ cleanup_demo() {
     cf disable-org-isolation demo-org large-cell 2>/dev/null || true
     cf delete-isolation-segment large-cell -f 2>/dev/null || true
     rm -f ~/Downloads/p-isolation-segment-large-cell-10.2.5.pivotal
+
+    echo ""
+    echo "Cleaning up Ops Manager..."
+    if om staged-products 2>/dev/null | grep -q "p-isolation-segment-large-cell"; then
+        echo "Unstaging large-cell tile from Ops Manager..."
+        om unstage-product --product-name p-isolation-segment-large-cell 2>/dev/null || true
+    fi
+
+    if om deployed-products 2>/dev/null | grep -q "p-isolation-segment-large-cell"; then
+        echo "Deleting large-cell tile from Ops Manager..."
+        om delete-product --product-name p-isolation-segment-large-cell --product-version 10.2.5 2>/dev/null || true
+        echo ""
+        echo -e "${YELLOW}Tile marked for deletion. Running Apply Changes...${NC}"
+        echo -e "${YELLOW}This will take 10-15 minutes. Press Ctrl+C to skip.${NC}"
+        echo ""
+        read -rp "Press ENTER to start Apply Changes (or Ctrl+C to skip): "
+        om apply-changes --product-name p-isolation-segment-large-cell 2>/dev/null || true
+    fi
+
     echo ""
     echo -e "${GREEN}✓ Demo environment reset${NC}"
     echo ""
