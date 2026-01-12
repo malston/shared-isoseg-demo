@@ -9,6 +9,6 @@ applications:
   - go_buildpack
   stack: cflinuxfs4
   env:
-    GOVERSION: go1.21
+    GOVERSION: go1.24
   health-check-type: http
   health-check-http-endpoint: /health
