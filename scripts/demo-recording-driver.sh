@@ -68,6 +68,13 @@ act1_scene1() {
   --source ~/Downloads/p-isolation-segment-10.2.5-build.2.pivotal \
   --name large-cell \
   --output ~/Downloads' "Create the large-cell replicated tile"
+    echo ""
+    echo -e "${YELLOW}Under the hood, this runs:${NC}"
+    echo -e "${BLUE}/tmp/replicator \\
+  --name large-cell \\
+  --path ~/Downloads/p-isolation-segment-10.2.5-build.2.pivotal \\
+  --output ~/Downloads/p-isolation-segment-large-cell-10.2.5.pivotal${NC}"
+    echo ""
     wait_for_enter || return
 
     show_command 'ls -lh ~/Downloads/p-isolation-segment-large-cell-10.2.5.pivotal' "Verify tile was created"
