@@ -2,7 +2,7 @@
 # ABOUTME: Interactive demo recording driver script
 # ABOUTME: Displays commands one at a time for manual execution during recording
 
-set -euo pipefail
+set -uo pipefail
 
 # Colors
 BLUE='\033[0;34m'
@@ -47,7 +47,7 @@ marker() {
 
 wait_for_enter() {
     echo -e "${CYAN}Press ENTER for next command (q to quit, s to skip scene)...${NC}"
-    read -r input
+    read -r input || input=""
     if [[ "$input" == "q" ]]; then
         echo "Exiting..."
         exit 0
