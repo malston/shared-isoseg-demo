@@ -115,7 +115,10 @@ act1_scene3() {
     show_command 'cf enable-org-isolation demo-org large-cell' "Enable for organization"
     wait_for_enter || return
 
-    show_command 'cf set-space-isolation-segment iso-validation large-cell' "Assign to validation space"
+    show_command 'cf create-space iso-validation -o demo-org' "Create validation space for operator testing"
+    wait_for_enter || return
+
+    show_command 'cf set-space-isolation-segment iso-validation large-cell' "Assign validation space to segment"
     wait_for_enter || return
 
     show_command 'cf isolation-segments' "Verify segment is registered"
@@ -256,9 +259,11 @@ cleanup_demo() {
     echo ""
     echo -e "${YELLOW}Cleaning up demo environment...${NC}"
     echo ""
+    cf target -o demo-org -s dev-space 2>/dev/null || true
     cf delete cf-env-test -f 2>/dev/null || true
     cf reset-space-isolation-segment dev-space 2>/dev/null || true
     cf reset-space-isolation-segment iso-validation 2>/dev/null || true
+    cf delete-space iso-validation -o demo-org -f 2>/dev/null || true
     cf disable-org-isolation demo-org large-cell 2>/dev/null || true
     cf delete-isolation-segment large-cell -f 2>/dev/null || true
     rm -f ~/Downloads/p-isolation-segment-large-cell-10.2.5.pivotal
