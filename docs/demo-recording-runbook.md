@@ -349,17 +349,20 @@ EOF
 
 **Duration**: ~2 minutes
 
-#### 2.3.1 - Assign Space to Isolation Segment (Platform already did this)
+#### 2.3.1 - Assign Space to Isolation Segment
 
 ```bash
-# Note: Platform operator already ran this command
-# cf set-space-isolation-segment dev-space large-cell
+# Platform operator assigns the space to the isolation segment
+cf set-space-isolation-segment dev-space large-cell
+```
 
-# Developer can verify:
+#### 2.3.2 - Developer Verifies Space Assignment
+
+```bash
 cf space dev-space
 ```
 
-#### 2.3.2 - Restage Application
+#### 2.3.3 - Restage Application
 
 ```bash
 # This is the ONLY action the developer needs to take
@@ -412,7 +415,21 @@ cf app spring-music | grep buildpack
 
 > **Narration cue**: "Same routes, same memory allocation, same buildpack. Zero code changes. Zero pipeline changes."
 
-#### 2.4.4 - Closing Summary
+#### 2.4.4 - Verify App Running on Isolated Cell
+
+```bash
+# Compare app host IP with isolated Diego cell IP
+echo "App running on: $(cf curl /v3/apps/$(cf app spring-music --guid)/processes/web/stats 2>/dev/null | jq -r '.resources[0].host')"
+echo "Large-cell Diego: $(bosh -d p-isolation-segment-large-cell-2ce92833ad1ce8f6e40a instances --json 2>/dev/null | jq -r '.Tables[0].Rows[0].ips')"
+```
+
+> **Narration cue**: "We can verify the app is running on the isolated cell by comparing the instance IP with the Diego cell IP."
+
+```bash
+echo "✓ Confirmed: spring-music is running on the large-cell isolation segment"
+```
+
+#### 2.4.5 - Closing Summary
 
 ```bash
 # Quick recap
