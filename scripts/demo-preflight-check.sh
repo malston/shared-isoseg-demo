@@ -184,7 +184,7 @@ check_demo_prerequisites() {
     if cf target -o demo-org -s dev-space &> /dev/null 2>&1; then
         if cf app spring-music &> /dev/null 2>&1; then
             local state=""
-            state=$(cf app spring-music 2>/dev/null | grep -i "state:" | awk '{print $2}') || state="unknown"
+            state=$(cf app spring-music 2>/dev/null | grep -i "^requested state:" | awk '{print $3}') || state="unknown"
             if [[ "$state" == "started" ]]; then
                 check_pass "Spring Music app running in dev-space"
             else
