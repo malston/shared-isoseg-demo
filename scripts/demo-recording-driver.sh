@@ -266,7 +266,7 @@ cleanup_demo() {
     cf reset-space-isolation-segment dev-space 2>/dev/null || true
     cf reset-space-isolation-segment iso-validation 2>/dev/null || true
     cf delete-space iso-validation -o demo-org -f 2>/dev/null || true
-    cf disable-org-isolation demo-org large-cell 2>/dev/null || true
+    cf disable-org-isolation demo-org large-cell >/dev/null 2>&1 || true
     cf delete-isolation-segment large-cell -f 2>/dev/null || true
     rm -f ~/Downloads/p-isolation-segment-large-cell-10.2.5.pivotal
 
