@@ -630,23 +630,31 @@ replicate_tile() {
 
     [[ ! -x "$replicator_path" ]] && fatal "Replicator not executable: $replicator_path"
 
-    # Determine output path if not specified
+    # Extract version from source filename for output naming
+    local source_basename
+    source_basename=$(basename "$source_tile")
+    local version_part
+    version_part=$(echo "$source_basename" | sed -E 's/p-isolation-segment-([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+
+    # Determine output path
     if [[ -z "$output_path" ]]; then
+        # Default to same directory as source
         local source_dir
-        local source_basename
         source_dir=$(dirname "$source_tile")
-        source_basename=$(basename "$source_tile")
-
-        # Extract version from source filename (e.g., p-isolation-segment-10.2.5+LTS-T.pivotal)
-        local version_part
-        version_part=$(echo "$source_basename" | sed -E 's/p-isolation-segment-([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
-
         if [[ -n "$version_part" && "$version_part" != "$source_basename" ]]; then
-            output_path="${source_dir}/${segment_name}-${version_part}.pivotal"
+            output_path="${source_dir}/p-isolation-segment-${segment_name}-${version_part}.pivotal"
         else
-            output_path="${source_dir}/${segment_name}.pivotal"
+            output_path="${source_dir}/p-isolation-segment-${segment_name}.pivotal"
+        fi
+    elif [[ -d "$output_path" ]]; then
+        # User provided a directory - construct filename inside it
+        if [[ -n "$version_part" && "$version_part" != "$source_basename" ]]; then
+            output_path="${output_path}/p-isolation-segment-${segment_name}-${version_part}.pivotal"
+        else
+            output_path="${output_path}/p-isolation-segment-${segment_name}.pivotal"
         fi
     fi
+    # Otherwise use output_path as-is (user provided full filename)
 
     info "Creating replicated tile"
     info "  Source: $source_tile"
