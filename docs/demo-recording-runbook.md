@@ -51,7 +51,7 @@
 ```bash
 # Show the download command
 ./scripts/isolation-segment-tile-migration.sh download-tile \
-  --version 6.0 \
+  --version 10.2 \
   --output-directory ~/Downloads
 ```
 
@@ -62,7 +62,7 @@
 ```bash
 # Download the replicator for the same release
 ./scripts/isolation-segment-tile-migration.sh download-replicator \
-  --version 6.0.23+LTS-T \
+  --version 10.2.5+LTS-T \
   --output-directory ~/Downloads
 ```
 
@@ -73,14 +73,14 @@
 ```bash
 # Create the large-cell tile
 ./scripts/isolation-segment-tile-migration.sh replicate-tile \
-  --source ~/Downloads/p-isolation-segment-6.0.23-build.68.pivotal \
+  --source ~/Downloads/p-isolation-segment-10.2.5-build.2.pivotal \
   --name large-cell \
-  --replicator ~/Downloads/replicator
+  --output ~/Downloads
 ```
 
 > **Narration cue**: "We create a tile instance named 'large-cell' - configured for resource-intensive workloads."
 
-**Checkpoint**: Verify `large-cell-6.0.23.pivotal` was created in ~/Downloads
+**Checkpoint**: Verify `p-isolation-segment-large-cell-10.2.5.pivotal` was created in ~/Downloads
 
 ---
 
@@ -94,7 +94,7 @@
 
 ```bash
 # Alternative: Upload via CLI
-om upload-product --product ~/Downloads/large-cell-6.0.23.pivotal
+om upload-product --product ~/Downloads/p-isolation-segment-large-cell-10.2.5.pivotal
 ```
 
 > **Narration cue**: "We upload the replicated tile to Ops Manager."
@@ -109,7 +109,7 @@ om upload-product --product ~/Downloads/large-cell-6.0.23.pivotal
 # Alternative: Stage via CLI
 om stage-product \
   --product-name p-isolation-segment-large-cell \
-  --product-version 6.0.23
+  --product-version 10.2.5
 ```
 
 **[BROWSER]** Show tile now appears in Installation Dashboard
