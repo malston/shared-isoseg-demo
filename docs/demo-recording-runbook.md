@@ -242,9 +242,12 @@ cf routes
 # Verify space shows isolation segment
 cf space iso-validation
 
+# Get the deployment name dynamically (includes GUID suffix)
+DEPLOY=$(bosh deployments --json | jq -r '.Tables[0].Rows[] | select(.name | startswith("p-isolation-segment-large-cell")) | .name')
+
 # Compare app host IP with isolated Diego cell IP
 echo "App running on: $(curl -s "https://$(cf app cf-env-test | grep routes | awk '{print $2}')/env" | grep CF_INSTANCE_IP | cut -d= -f2)"
-echo "Large-cell Diego: $(bosh -d p-isolation-segment-large-cell-2ce92833ad1ce8f6e40a instances --json 2>/dev/null | jq -r '.Tables[0].Rows[0].ips')"
+echo "Large-cell Diego: $(bosh -d $DEPLOY instances --json 2>/dev/null | jq -r '.Tables[0].Rows[0].ips')"
 ```
 
 > **Narration cue**: "We verify the app is running on the isolated cell by comparing the instance IP with the Diego cell IP. They match - the app is on the large-cell segment."
@@ -252,8 +255,9 @@ echo "Large-cell Diego: $(bosh -d p-isolation-segment-large-cell-2ce92833ad1ce8f
 #### 1.4.4 - Verify BOSH Placement Tags
 
 ```bash
-# SSH into isolated Diego cell to verify placement tags
-bosh -d p-isolation-segment-large-cell-2ce92833ad1ce8f6e40a ssh isolated_diego_cell_large_cell/0 \
+# Get deployment name and SSH into isolated Diego cell to verify placement tags
+DEPLOY=$(bosh deployments --json | jq -r '.Tables[0].Rows[] | select(.name | startswith("p-isolation-segment-large-cell")) | .name')
+bosh -d $DEPLOY ssh isolated_diego_cell_large_cell/0 \
   -c "cat /var/vcap/jobs/rep/config/rep.json | jq .placement_tags"
 # Expected output: ["large-cell"]
 ```
@@ -429,9 +433,12 @@ cf app spring-music | grep buildpack
 #### 2.4.4 - Verify App Running on Isolated Cell
 
 ```bash
+# Get deployment name dynamically
+DEPLOY=$(bosh deployments --json | jq -r '.Tables[0].Rows[] | select(.name | startswith("p-isolation-segment-large-cell")) | .name')
+
 # Compare app host IP with isolated Diego cell IP
 echo "App running on: $(cf curl /v3/apps/$(cf app spring-music --guid)/processes/web/stats 2>/dev/null | jq -r '.resources[0].host')"
-echo "Large-cell Diego: $(bosh -d p-isolation-segment-large-cell-2ce92833ad1ce8f6e40a instances --json 2>/dev/null | jq -r '.Tables[0].Rows[0].ips')"
+echo "Large-cell Diego: $(bosh -d $DEPLOY instances --json 2>/dev/null | jq -r '.Tables[0].Rows[0].ips')"
 ```
 
 > **Narration cue**: "We can verify the app is running on the isolated cell by comparing the instance IP with the Diego cell IP."
