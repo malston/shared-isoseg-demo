@@ -249,14 +249,25 @@ echo "Large-cell Diego: $(bosh -d p-isolation-segment-large-cell-2ce92833ad1ce8f
 
 > **Narration cue**: "We verify the app is running on the isolated cell by comparing the instance IP with the Diego cell IP. They match - the app is on the large-cell segment."
 
-#### 1.4.4 - Segment Ready Declaration
+#### 1.4.4 - Verify BOSH Placement Tags
 
 ```bash
-# Final confirmation
-echo "Isolation segment 'large-cell' validated and ready for tenant workloads"
+# SSH into isolated Diego cell to verify placement tags
+bosh -d p-isolation-segment-large-cell-2ce92833ad1ce8f6e40a ssh isolated_diego_cell_large_cell/0 \
+  -c "cat /var/vcap/jobs/rep/config/rep.json | jq .placement_tags"
+# Expected output: ["large-cell"]
+```
 
+> **Narration cue**: "At the infrastructure level, we can verify the Diego cell's placement tags. This is what tells Diego to schedule apps from the 'large-cell' isolation segment onto this cell."
+
+#### 1.4.5 - Segment Ready Declaration
+
+```bash
 # Show segment status
 cf isolation-segments
+
+# Final confirmation
+echo "Isolation segment 'large-cell' validated and ready for tenant workloads"
 ```
 
 > **Narration cue**: "The segment is validated. We can now notify development teams to migrate their workloads."

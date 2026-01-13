@@ -86,7 +86,7 @@
 
 ### Scene 1.4: Operator Validation
 
-**[7:00 - 11:00]**
+**[7:30 - 11:00]**
 
 **[1.4.1 - Deploy Test App]**
 > We deploy a lightweight test application - "cf-env" - a simple Go app that displays environment information. This validates that workloads can actually run on the isolated cells.
@@ -94,21 +94,16 @@
 **[1.4.2 - Verify Running]**
 > The app is running. Let's access it in the browser to confirm it responds correctly.
 
-**[1.4.3 - Four-Layer Verification]**
-> Now for comprehensive validation. We check four layers to confirm the segment is working:
->
-> **Layer 1 - Cloud Foundry CLI**: The "cf space" command shows the isolation segment assignment. This is what developers will see.
->
-> **Layer 2 - BOSH**: We verify the Diego cell is deployed and healthy in the BOSH director. This confirms the infrastructure layer.
->
-> **Layer 3 - Diego**: We check that the app is scheduled on cells belonging to this isolation segment, not shared cells.
->
-> **Layer 4 - Application**: The app's environment variables show the Cell IP, confirming physical placement on the isolated infrastructure.
+**[1.4.3 - IP Verification]**
+> We verify the app is running on the isolated cell by comparing IP addresses. The app's instance IP matches the Diego cell IP from BOSH - proving physical isolation.
+
+**[1.4.4 - BOSH Placement Tags]**
+> At the infrastructure level, we SSH into the Diego cell and check its placement tags. The output shows "large-cell" - this is what tells Diego to schedule apps from our isolation segment onto this specific cell. This is the definitive proof of isolation at the BOSH layer.
 
 **[KEY MESSAGE BOX]**
-> **Four-layer verification ensures the segment is fully operational before onboarding tenant workloads**
+> **Placement tags are the mechanism that enforces workload isolation at the infrastructure level**
 
-**[1.4.4 - Ready Declaration]**
+**[1.4.5 - Ready Declaration]**
 > The isolation segment "large-cell" is validated and ready for production workloads. We can now notify development teams to migrate their applications.
 
 ---

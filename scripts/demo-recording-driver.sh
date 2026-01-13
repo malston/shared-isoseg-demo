@@ -169,7 +169,14 @@ act1_scene4() {
     wait_for_enter || return
 
     show_command 'echo "App running on: $(curl -s "https://$(cf app cf-env-test | grep routes | awk '"'"'{print $2}'"'"')/env" | grep CF_INSTANCE_IP | cut -d= -f2)"
-echo "Large-cell Diego: $(bosh -d p-isolation-segment-large-cell-2ce92833ad1ce8f6e40a instances --json 2>/dev/null | jq -r '"'"'.Tables[0].Rows[0].ips'"'"')"' "Verify app running on isolated cell"
+echo "Large-cell Diego: $(bosh -d p-isolation-segment-large-cell-2ce92833ad1ce8f6e40a instances --json 2>/dev/null | jq -r '"'"'.Tables[0].Rows[0].ips'"'"')"' "Verify app running on isolated cell (IP comparison)"
+    wait_for_enter || return
+
+    show_command 'bosh -d p-isolation-segment-large-cell-2ce92833ad1ce8f6e40a ssh isolated_diego_cell_large_cell/0 \
+  -c "cat /var/vcap/jobs/rep/config/rep.json | jq .placement_tags"' "Verify BOSH placement tags on isolated cell"
+    echo ""
+    echo -e "${YELLOW}Expected output: [\"large-cell\"]${NC}"
+    echo ""
     wait_for_enter || return
 
     show_command 'cf isolation-segments' "Show final segment status"
