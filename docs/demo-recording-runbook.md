@@ -55,9 +55,9 @@
 #### 1.1.1 - Download Isolation Segment Tile
 
 ```bash
-# Show the download command
+# Show the download command (10.2.5+LTS-T resolves to p-isolation-segment-10.2.5-build.2.pivotal)
 ./scripts/isolation-segment-tile-migration.sh download-tile \
-  --version 10.2 \
+  --version 10.2.5+LTS-T \
   --output-directory ~/Downloads
 ```
 
