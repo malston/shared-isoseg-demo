@@ -65,25 +65,22 @@
 
 ### Scene 1.3: Segment Registration
 
-**[5:30 - 7:00]**
+**[5:30 - 7:30]**
 
 **[RESUME after Apply Changes]**
 > The deployment is complete. Now we register the segment in Cloud Foundry's Cloud Controller.
 
 **[1.3.1 - Create Segment]**
-> The "create-isolation-segment" command registers the name with Cloud Foundry. This creates the logical segment that spaces can be assigned to.
+> The "create-isolation-segment" command registers the name with Cloud Foundry. This creates the logical segment that spaces can be assigned to. We immediately verify it's registered.
 
 **[1.3.2 - Enable for Org]**
-> Organizations must be explicitly entitled to use each isolation segment. This is an important security boundary - it prevents unauthorized use of isolated compute resources.
+> Organizations must be explicitly entitled to use each isolation segment. This is an important security boundary - it prevents unauthorized use of isolated compute resources. The "cf org" command confirms our org is now entitled to use the segment.
 
 **[1.3.3 - Create Validation Space]**
 > Before notifying developers, we create a dedicated validation space. This "iso-validation" space is separate from developer workspaces - it's where operators test the segment before onboarding tenants.
 
 **[1.3.4 - Assign Space to Segment]**
-> We assign the validation space to our isolation segment. Any apps pushed to this space will now run on the isolated Diego cells.
-
-**[1.3.5 - Verify Configuration]**
-> A quick verification confirms the segment is registered, the org is entitled, and the space is assigned.
+> We assign the validation space to our isolation segment. The "cf space" command confirms the assignment - any apps pushed to this space will now run on the isolated Diego cells.
 
 ---
 
