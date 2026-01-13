@@ -305,11 +305,8 @@ product-properties:
   .properties.compute_isolation.enabled.isolation_segment_name:
     value: small-cell
   .properties.routing_table_sharding_mode:
-    selected_option: isolation_segment_list
-    value: isolation_segment_list
-  .properties.routing_table_sharding_mode.isolation_segment_list.names:
-    value:
-    - small-cell
+    selected_option: isolation_segment_only
+    value: isolation_segment_only
   .properties.networking_poe_ssl_certs:
     value:
     - certificate:

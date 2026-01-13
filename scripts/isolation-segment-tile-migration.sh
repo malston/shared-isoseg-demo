@@ -944,7 +944,7 @@ configure_segment() {
         info "    --vars-file $vars_file \\"
         [[ -n "$secrets_file" ]] && info "    --vars-file $secrets_file \\"
         info "    --ops-file ${features_dir}/compute_isolation-enabled.yml \\"
-        info "    --ops-file ${features_dir}/routing_table_sharding_mode-isolation_segment_list.yml"
+        info "    --ops-file ${features_dir}/routing_table_sharding_mode-isolation_segment_only.yml"
         return 0
     fi
 
@@ -989,7 +989,7 @@ configure_segment() {
         --config "$temp_product_yml" \
         "${vars_args[@]}" \
         --ops-file "${features_dir}/compute_isolation-enabled.yml" \
-        --ops-file "${features_dir}/routing_table_sharding_mode-isolation_segment_list.yml"; then
+        --ops-file "${features_dir}/routing_table_sharding_mode-isolation_segment_only.yml"; then
 
         rm -f "$temp_product_yml"
         success "Product $product_name configured successfully"

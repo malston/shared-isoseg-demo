@@ -51,11 +51,8 @@ product-properties:
     selected_option: log_client_ips
     value: log_client_ips
   .properties.routing_table_sharding_mode:
-    selected_option: isolation_segment_list
-    value: isolation_segment_list
-  .properties.routing_table_sharding_mode.isolation_segment_list.names:
-    value:
-    - ((segment_name))
+    selected_option: isolation_segment_only
+    value: isolation_segment_only
   .properties.routing_tls_termination:
     selected_option: load_balancer
     value: load_balancer
