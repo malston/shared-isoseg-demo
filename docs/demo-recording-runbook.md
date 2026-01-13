@@ -6,30 +6,36 @@
 ## Pre-Recording Checklist
 
 ### Environment Requirements
+
 - [ ] TAS foundation with Ops Manager accessible
 - [ ] At least 1 Diego cell available for isolation segment
 - [ ] Network connectivity to Broadcom Support Portal
 
 ### CLI Tools Configured
+
 - [ ] `om` CLI authenticated (OM_TARGET, OM_USERNAME, OM_PASSWORD exported)
 - [ ] `cf` CLI authenticated (`cf login` completed)
 - [ ] `pivnet` CLI available with PIVNET_TOKEN set
 - [ ] `jq` installed for JSON parsing
 
 ### Pre-Recording Setup
+
 - [ ] Spring Music deployed to shared space (`cf push spring-music`)
 - [ ] cf-env app built and ready (`cd apps/cf-env && go build`)
 - [ ] Demo org and spaces created:
+
   ```bash
   cf create-org demo-org
   cf create-space dev-space -o demo-org      # Developer's existing space
   cf create-space iso-validation -o demo-org  # Operator's test space
   ```
+
 - [ ] Terminal font size readable (14-16pt recommended)
 - [ ] Browser logged into Ops Manager, zoom 100-110%
 - [ ] Screen recording software ready
 
 ### Credential Management
+
 - [ ] All credentials in environment variables (no typing passwords on camera)
 - [ ] `.envrc` or equivalent sourced with OM_*, CF_*, PIVNET_TOKEN
 
@@ -49,9 +55,9 @@
 #### 1.1.1 - Download Isolation Segment Tile
 
 ```bash
-# Show the download command
+# Show the download command (10.2.5+LTS-T resolves to p-isolation-segment-10.2.5-build.2.pivotal)
 ./scripts/isolation-segment-tile-migration.sh download-tile \
-  --version 6.0 \
+  --version 10.2.5+LTS-T \
   --output-directory ~/Downloads
 ```
 
@@ -62,7 +68,7 @@
 ```bash
 # Download the replicator for the same release
 ./scripts/isolation-segment-tile-migration.sh download-replicator \
-  --version 6.0.23+LTS-T \
+  --version 10.2.5+LTS-T \
   --output-directory ~/Downloads
 ```
 
@@ -73,14 +79,14 @@
 ```bash
 # Create the large-cell tile
 ./scripts/isolation-segment-tile-migration.sh replicate-tile \
-  --source ~/Downloads/p-isolation-segment-6.0.23-build.68.pivotal \
+  --source ~/Downloads/p-isolation-segment-10.2.5-build.2.pivotal \
   --name large-cell \
-  --replicator ~/Downloads/replicator
+  --output ~/Downloads
 ```
 
 > **Narration cue**: "We create a tile instance named 'large-cell' - configured for resource-intensive workloads."
 
-**Checkpoint**: Verify `large-cell-6.0.23.pivotal` was created in ~/Downloads
+**Checkpoint**: Verify `p-isolation-segment-large-cell-10.2.5.pivotal` was created in ~/Downloads
 
 ---
 
@@ -94,7 +100,7 @@
 
 ```bash
 # Alternative: Upload via CLI
-om upload-product --product ~/Downloads/large-cell-6.0.23.pivotal
+om upload-product --product ~/Downloads/p-isolation-segment-large-cell-10.2.5.pivotal
 ```
 
 > **Narration cue**: "We upload the replicated tile to Ops Manager."
@@ -109,7 +115,7 @@ om upload-product --product ~/Downloads/large-cell-6.0.23.pivotal
 # Alternative: Stage via CLI
 om stage-product \
   --product-name p-isolation-segment-large-cell \
-  --product-version 6.0.23
+  --product-version 10.2.5
 ```
 
 **[BROWSER]** Show tile now appears in Installation Dashboard
@@ -119,6 +125,7 @@ om stage-product \
 **[BROWSER]** Click on the tile to open configuration
 
 Walk through key configuration sections:
+
 1. **Assign AZs and Networks** - Show AZ selection
 2. **Isolated Diego Cells** - Point out cell count (1 for lab)
 3. **Networking** - Note: 0 routers (shared routing mode)
@@ -157,6 +164,9 @@ Walk through key configuration sections:
 ```bash
 # Register the segment in Cloud Controller
 cf create-isolation-segment large-cell
+
+# Verify segment is registered
+cf isolation-segments
 ```
 
 > **Narration cue**: "We register the segment name with Cloud Foundry's Cloud Controller."
@@ -166,31 +176,33 @@ cf create-isolation-segment large-cell
 ```bash
 # Allow the demo org to use this segment
 cf enable-org-isolation demo-org large-cell
+
+# Verify org entitlement (shows "isolation segments: large-cell")
+cf org demo-org
 ```
 
 > **Narration cue**: "Organizations must be explicitly entitled to use each isolation segment."
 
-#### 1.3.3 - Assign Segment to Validation Space
+#### 1.3.3 - Create Validation Space
 
 ```bash
-# Assign to operator's test space
-cf set-space-isolation-segment iso-validation large-cell
+# Create operator's test space
+cf create-space iso-validation -o demo-org
 ```
 
-> **Narration cue**: "Before notifying developers, we'll validate the segment with a test application."
+> **Narration cue**: "We create a dedicated validation space separate from developer workspaces."
 
-#### 1.3.4 - Verify Segment Configuration
+#### 1.3.4 - Assign Space to Segment
 
 ```bash
-# Confirm segment is registered
-cf isolation-segments
+# Assign validation space to isolation segment
+cf set-space-isolation-segment iso-validation large-cell
 
-# Confirm org entitlement
-cf org demo-org --guid && cf curl /v3/organizations/$(cf org demo-org --guid)/relationships/default_isolation_segment
-
-# Confirm space assignment
+# Verify space assignment
 cf space iso-validation
 ```
+
+> **Narration cue**: "Apps pushed to this space will now run on the isolated Diego cells."
 
 ---
 
@@ -219,44 +231,47 @@ cd ../..
 cf app cf-env-test
 
 # Get the app URL
-cf app cf-env-test | grep routes
+cf routes
 ```
 
 **[BROWSER]** Open app URL to show it's responding
 
-#### 1.4.3 - Full 4-Layer Verification
+#### 1.4.3 - Verify App Running on Isolated Cell
 
 ```bash
-# Run the demo script's verification (captures comprehensive state)
-./scripts/demo-isolation-segment-migration.sh --capture-state cf-env-test
-```
-
-Or manually verify each layer:
-
-```bash
-# Layer 1: CF CLI - Isolation segment visible
+# Verify space shows isolation segment
 cf space iso-validation
 
-# Layer 2: BOSH - Cell placement
-bosh -d p-isolation-segment-large-cell-* instances
+# Get the deployment name dynamically (includes GUID suffix)
+DEPLOYMENT=$(bosh deployments --json | jq -r '.Tables[0].Rows[] | select(.name | startswith("p-isolation-segment-large-cell")) | .name')
 
-# Layer 3: Diego - Cell metrics
-cf curl /v3/apps/$(cf app cf-env-test --guid)/processes | jq '.resources[0].instances'
-
-# Layer 4: App environment
-curl -s "https://$(cf app cf-env-test | grep routes | awk '{print $2}')/env" | jq '.CF_INSTANCE_IP'
+# Compare app host IP with isolated Diego cell IP
+echo "App running on: $(curl -s "https://$(cf app cf-env-test | grep routes | awk '{print $2}')/env" | grep CF_INSTANCE_IP | cut -d= -f2)"
+echo "Large-cell Diego: $(bosh -d $DEPLOYMENT instances --json 2>/dev/null | jq -r '.Tables[0].Rows[0].ips')"
 ```
 
-> **Narration cue**: "Four-layer verification confirms: CF sees the segment, BOSH deployed the cell, Diego scheduled the app, and the app is running on the isolated cell."
+> **Narration cue**: "We verify the app is running on the isolated cell by comparing the instance IP with the Diego cell IP. They match - the app is on the large-cell segment."
 
-#### 1.4.4 - Segment Ready Declaration
+#### 1.4.4 - Verify BOSH Placement Tags
 
 ```bash
-# Final confirmation
-echo "Isolation segment 'large-cell' validated and ready for tenant workloads"
+# Get deployment name and SSH into isolated Diego cell to verify placement tags
+DEPLOYMENT=$(bosh deployments --json | jq -r '.Tables[0].Rows[] | select(.name | startswith("p-isolation-segment-large-cell")) | .name')
+bosh -d $DEPLOYMENT ssh isolated_diego_cell_large_cell/0 \
+  -c "cat /var/vcap/jobs/rep/config/rep.json | jq .placement_tags"
+# Expected output: ["large-cell"]
+```
 
+> **Narration cue**: "At the infrastructure level, we can verify the Diego cell's placement tags. This is what tells Diego to schedule apps from the 'large-cell' isolation segment onto this cell."
+
+#### 1.4.5 - Segment Ready Declaration
+
+```bash
 # Show segment status
 cf isolation-segments
+
+# Final confirmation
+echo "Isolation segment 'large-cell' validated and ready for tenant workloads"
 ```
 
 > **Narration cue**: "The segment is validated. We can now notify development teams to migrate their workloads."
@@ -349,17 +364,20 @@ EOF
 
 **Duration**: ~2 minutes
 
-#### 2.3.1 - Assign Space to Isolation Segment (Platform already did this)
+#### 2.3.1 - Assign Space to Isolation Segment
 
 ```bash
-# Note: Platform operator already ran this command
-# cf set-space-isolation-segment dev-space large-cell
+# Platform operator assigns the space to the isolation segment
+cf set-space-isolation-segment dev-space large-cell
+```
 
-# Developer can verify:
+#### 2.3.2 - Developer Verifies Space Assignment
+
+```bash
 cf space dev-space
 ```
 
-#### 2.3.2 - Restage Application
+#### 2.3.3 - Restage Application
 
 ```bash
 # This is the ONLY action the developer needs to take
@@ -412,7 +430,24 @@ cf app spring-music | grep buildpack
 
 > **Narration cue**: "Same routes, same memory allocation, same buildpack. Zero code changes. Zero pipeline changes."
 
-#### 2.4.4 - Closing Summary
+#### 2.4.4 - Verify App Running on Isolated Cell
+
+```bash
+# Get deployment name dynamically
+DEPLOYMENT=$(bosh deployments --json | jq -r '.Tables[0].Rows[] | select(.name | startswith("p-isolation-segment-large-cell")) | .name')
+
+# Compare app host IP with isolated Diego cell IP
+echo "App running on: $(cf curl /v3/apps/$(cf app spring-music --guid)/processes/web/stats 2>/dev/null | jq -r '.resources[0].host')"
+echo "Large-cell Diego: $(bosh -d $DEPLOYMENT instances --json 2>/dev/null | jq -r '.Tables[0].Rows[0].ips')"
+```
+
+> **Narration cue**: "We can verify the app is running on the isolated cell by comparing the instance IP with the Diego cell IP."
+
+```bash
+echo "✓ Confirmed: spring-music is running on the large-cell isolation segment"
+```
+
+#### 2.4.5 - Closing Summary
 
 ```bash
 # Quick recap
@@ -457,11 +492,13 @@ cf delete-isolation-segment large-cell -f
 ## Recording Notes
 
 ### Cuts
+
 - **[CUT]**: Stop recording at this point
 - **[RESUME]**: Start recording again
 - **[BROWSER]**: Switch to browser view
 
 ### Timing Markers
+
 - Add chapter markers at each Scene start
 - Note timestamp at each [CUT] for editing reference
 

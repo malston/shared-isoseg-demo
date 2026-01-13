@@ -19,10 +19,6 @@ networking_poe_ssl_certs_0_name: large-cell
 # Feature: compute_isolation (ops file variable)
 compute_isolation_enabled_isolation_segment_name: large-cell
 
-# Feature: routing_table_sharding_mode (ops file variable)
-routing_table_sharding_mode_isolation_segment_list_names:
-- large-cell
-
 # Resource configuration
 resource-var-isolated_diego_cell_instances: 1
 resource-var-isolated_diego_cell_instance_type: automatic

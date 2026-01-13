@@ -65,28 +65,28 @@
 
 ### Scene 1.3: Segment Registration
 
-**[5:30 - 7:00]**
+**[5:30 - 7:30]**
 
 **[RESUME after Apply Changes]**
 > The deployment is complete. Now we register the segment in Cloud Foundry's Cloud Controller.
 
 **[1.3.1 - Create Segment]**
-> The "create-isolation-segment" command registers the name with Cloud Foundry. This creates the logical segment that spaces can be assigned to.
+> The "create-isolation-segment" command registers the name with Cloud Foundry. This creates the logical segment that spaces can be assigned to. We immediately verify it's registered.
 
 **[1.3.2 - Enable for Org]**
-> Organizations must be explicitly entitled to use each isolation segment. This is an important security boundary - it prevents unauthorized use of isolated compute resources.
+> Organizations must be explicitly entitled to use each isolation segment. This is an important security boundary - it prevents unauthorized use of isolated compute resources. The "cf org" command confirms our org is now entitled to use the segment.
 
-**[1.3.3 - Assign to Space]**
-> Before notifying developers, we'll validate the segment using a test space. This "iso-validation" space is separate from developer workspaces.
+**[1.3.3 - Create Validation Space]**
+> Before notifying developers, we create a dedicated validation space. This "iso-validation" space is separate from developer workspaces - it's where operators test the segment before onboarding tenants.
 
-**[1.3.4 - Verify Configuration]**
-> A quick verification confirms the segment is registered, the org is entitled, and the space is assigned.
+**[1.3.4 - Assign Space to Segment]**
+> We assign the validation space to our isolation segment. The "cf space" command confirms the assignment - any apps pushed to this space will now run on the isolated Diego cells.
 
 ---
 
 ### Scene 1.4: Operator Validation
 
-**[7:00 - 11:00]**
+**[7:30 - 11:00]**
 
 **[1.4.1 - Deploy Test App]**
 > We deploy a lightweight test application - "cf-env" - a simple Go app that displays environment information. This validates that workloads can actually run on the isolated cells.
@@ -94,21 +94,16 @@
 **[1.4.2 - Verify Running]**
 > The app is running. Let's access it in the browser to confirm it responds correctly.
 
-**[1.4.3 - Four-Layer Verification]**
-> Now for comprehensive validation. We check four layers to confirm the segment is working:
->
-> **Layer 1 - Cloud Foundry CLI**: The "cf space" command shows the isolation segment assignment. This is what developers will see.
->
-> **Layer 2 - BOSH**: We verify the Diego cell is deployed and healthy in the BOSH director. This confirms the infrastructure layer.
->
-> **Layer 3 - Diego**: We check that the app is scheduled on cells belonging to this isolation segment, not shared cells.
->
-> **Layer 4 - Application**: The app's environment variables show the Cell IP, confirming physical placement on the isolated infrastructure.
+**[1.4.3 - IP Verification]**
+> We verify the app is running on the isolated cell by comparing IP addresses. The app's instance IP matches the Diego cell IP from BOSH - proving physical isolation.
+
+**[1.4.4 - BOSH Placement Tags]**
+> At the infrastructure level, we SSH into the Diego cell and check its placement tags. The output shows "large-cell" - this is what tells Diego to schedule apps from our isolation segment onto this specific cell. This is the definitive proof of isolation at the BOSH layer.
 
 **[KEY MESSAGE BOX]**
-> **Four-layer verification ensures the segment is fully operational before onboarding tenant workloads**
+> **Placement tags are the mechanism that enforces workload isolation at the infrastructure level**
 
-**[1.4.4 - Ready Declaration]**
+**[1.4.5 - Ready Declaration]**
 > The isolation segment "large-cell" is validated and ready for production workloads. We can now notify development teams to migrate their applications.
 
 ---
@@ -149,14 +144,17 @@
 
 ---
 
-### Scene 2.3: Restage
+### Scene 2.3: Developer Performs Restage
 
 **[14:00 - 16:00]**
 
-**[2.3.1 - Verify Assignment]**
-> The platform operator has already assigned the space to the isolation segment. The developer can verify this with "cf space."
+**[2.3.1 - Operator Assigns Space]**
+> The platform operator assigns the developer's space to the isolation segment. This is a one-time configuration change - developers don't need elevated permissions to trigger this.
 
-**[2.3.2 - Restage Command]**
+**[2.3.2 - Developer Verifies Assignment]**
+> The developer can verify their space has been assigned to the isolation segment with "cf space." They'll see the segment name listed.
+
+**[2.3.3 - Restage Command]**
 > Now the developer runs the restage command. This rebuilds the application droplet and restarts the app on the new isolated cells.
 >
 > Notice: no changes to the application code, no changes to the manifest, no changes to the CI/CD pipeline. The same deployment process, the same artifact - just running on different infrastructure.
@@ -165,7 +163,7 @@
 
 ---
 
-### Scene 2.4: Verification
+### Scene 2.4: Developer Verification
 
 **[16:00 - 19:00]**
 
@@ -185,6 +183,12 @@
 > **Buildpack**: Same build process, same dependencies.
 >
 > The only change is WHERE the app runs - on isolated compute, instead of shared compute.
+
+**[2.4.4 - Physical Verification]**
+> We can verify the app is actually running on the isolated Diego cell by comparing IP addresses. The app's instance IP matches the isolated cell IP - proving physical isolation.
+
+**[2.4.5 - Closing Summary]**
+> To summarize: the developer ran one command - "cf restage" - and their application is now running on dedicated isolated infrastructure. No code changes, no route changes, no pipeline changes.
 
 **[KEY MESSAGE BOX]**
 > **Zero code changes. Zero route changes. Zero pipeline changes. Just restage.**
@@ -226,13 +230,13 @@ Use these phrases consistently throughout the narration:
 |---------|-------|-----|----------|
 | Introduction | 0:00 | 0:45 | 45 sec |
 | Scene 1.1 - Tile Acquisition | 0:45 | 2:30 | 1:45 |
-| Scene 1.2 - Ops Manager | 2:30 | 5:30 | 3:00 |
-| Scene 1.3 - Registration | 5:30 | 7:00 | 1:30 |
-| Scene 1.4 - Validation | 7:00 | 11:00 | 4:00 |
+| Scene 1.2 - Ops Manager Installation | 2:30 | 5:30 | 3:00 |
+| Scene 1.3 - Segment Registration | 5:30 | 7:30 | 2:00 |
+| Scene 1.4 - Operator Validation | 7:30 | 11:00 | 3:30 |
 | Scene 2.1 - Before State | 11:00 | 13:00 | 2:00 |
-| Scene 2.2 - Notice | 13:00 | 14:00 | 1:00 |
-| Scene 2.3 - Restage | 14:00 | 16:00 | 2:00 |
-| Scene 2.4 - Verification | 16:00 | 19:00 | 3:00 |
+| Scene 2.2 - Migration Notice | 13:00 | 14:00 | 1:00 |
+| Scene 2.3 - Developer Performs Restage | 14:00 | 16:00 | 2:00 |
+| Scene 2.4 - Developer Verification | 16:00 | 19:00 | 3:00 |
 | Closing | 19:00 | 20:00 | 1:00 |
 | **Total** | | | **~20 min** |
 
