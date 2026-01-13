@@ -64,6 +64,22 @@ wait_for_enter() {
 act1_scene1() {
     scene "Scene 1.1: Tile Acquisition"
 
+    show_command './scripts/isolation-segment-tile-migration.sh download-tile \
+  --version 10.2.5+LTS-T \
+  --output-directory ~/Downloads' "Download isolation segment tile from Pivnet"
+    echo ""
+    echo -e "${YELLOW}✓ Already completed - tile pre-downloaded for demo${NC}"
+    echo ""
+    wait_for_enter || return
+
+    show_command './scripts/isolation-segment-tile-migration.sh download-replicator \
+  --version 10.2.5+LTS-T \
+  --output-directory ~/Downloads' "Download Replicator tool"
+    echo ""
+    echo -e "${YELLOW}✓ Already completed - replicator pre-downloaded for demo${NC}"
+    echo ""
+    wait_for_enter || return
+
     show_command './scripts/isolation-segment-tile-migration.sh replicate-tile \
   --source ~/Downloads/p-isolation-segment-10.2.5-build.2.pivotal \
   --name large-cell \
@@ -124,6 +140,9 @@ act1_scene3() {
     show_command 'cf isolation-segments' "Verify segment is registered"
     wait_for_enter || return
 
+    show_command 'cf curl /v3/organizations/$(cf org demo-org --guid)/relationships/default_isolation_segment' "Verify org entitlement"
+    wait_for_enter || return
+
     show_command 'cf space iso-validation' "Verify space assignment"
     wait_for_enter || return
 }
@@ -140,6 +159,9 @@ act1_scene4() {
     show_command 'cf app cf-env-test' "Verify app is running"
     wait_for_enter || return
 
+    show_command 'cf routes' "Show routes in space"
+    wait_for_enter || return
+
     marker "[BROWSER] Open app URL to show it responds"
     wait_for_enter || return
 
@@ -148,6 +170,9 @@ act1_scene4() {
 
     show_command 'echo "App running on: $(curl -s "https://$(cf app cf-env-test | grep routes | awk '"'"'{print $2}'"'"')/env" | grep CF_INSTANCE_IP | cut -d= -f2)"
 echo "Large-cell Diego: $(bosh -d p-isolation-segment-large-cell-2ce92833ad1ce8f6e40a instances --json 2>/dev/null | jq -r '"'"'.Tables[0].Rows[0].ips'"'"')"' "Verify app running on isolated cell"
+    wait_for_enter || return
+
+    show_command 'cf isolation-segments' "Show final segment status"
     wait_for_enter || return
 
     show_command 'echo "Isolation segment '"'"'large-cell'"'"' validated and ready for tenant workloads"' "Declare segment ready"
