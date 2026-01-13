@@ -140,7 +140,7 @@ act1_scene3() {
     show_command 'cf isolation-segments' "Verify segment is registered"
     wait_for_enter || return
 
-    show_command 'cf curl /v3/organizations/$(cf org demo-org --guid)/relationships/default_isolation_segment' "Verify org entitlement"
+    show_command 'cf org demo-org' "Verify org entitlement (shows isolation segments)"
     wait_for_enter || return
 
     show_command 'cf space iso-validation' "Verify space assignment"

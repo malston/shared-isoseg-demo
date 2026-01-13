@@ -192,8 +192,8 @@ cf set-space-isolation-segment iso-validation large-cell
 # Confirm segment is registered
 cf isolation-segments
 
-# Confirm org entitlement
-cf org demo-org --guid && cf curl /v3/organizations/$(cf org demo-org --guid)/relationships/default_isolation_segment
+# Confirm org entitlement (shows "isolation segments: large-cell")
+cf org demo-org
 
 # Confirm space assignment
 cf space iso-validation
