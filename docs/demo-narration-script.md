@@ -76,10 +76,13 @@
 **[1.3.2 - Enable for Org]**
 > Organizations must be explicitly entitled to use each isolation segment. This is an important security boundary - it prevents unauthorized use of isolated compute resources.
 
-**[1.3.3 - Assign to Space]**
-> Before notifying developers, we'll validate the segment using a test space. This "iso-validation" space is separate from developer workspaces.
+**[1.3.3 - Create Validation Space]**
+> Before notifying developers, we create a dedicated validation space. This "iso-validation" space is separate from developer workspaces - it's where operators test the segment before onboarding tenants.
 
-**[1.3.4 - Verify Configuration]**
+**[1.3.4 - Assign Space to Segment]**
+> We assign the validation space to our isolation segment. Any apps pushed to this space will now run on the isolated Diego cells.
+
+**[1.3.5 - Verify Configuration]**
 > A quick verification confirms the segment is registered, the org is entitled, and the space is assigned.
 
 ---
@@ -149,14 +152,17 @@
 
 ---
 
-### Scene 2.3: Restage
+### Scene 2.3: Developer Performs Restage
 
 **[14:00 - 16:00]**
 
-**[2.3.1 - Verify Assignment]**
-> The platform operator has already assigned the space to the isolation segment. The developer can verify this with "cf space."
+**[2.3.1 - Operator Assigns Space]**
+> The platform operator assigns the developer's space to the isolation segment. This is a one-time configuration change - developers don't need elevated permissions to trigger this.
 
-**[2.3.2 - Restage Command]**
+**[2.3.2 - Developer Verifies Assignment]**
+> The developer can verify their space has been assigned to the isolation segment with "cf space." They'll see the segment name listed.
+
+**[2.3.3 - Restage Command]**
 > Now the developer runs the restage command. This rebuilds the application droplet and restarts the app on the new isolated cells.
 >
 > Notice: no changes to the application code, no changes to the manifest, no changes to the CI/CD pipeline. The same deployment process, the same artifact - just running on different infrastructure.
@@ -165,7 +171,7 @@
 
 ---
 
-### Scene 2.4: Verification
+### Scene 2.4: Developer Verification
 
 **[16:00 - 19:00]**
 
@@ -185,6 +191,12 @@
 > **Buildpack**: Same build process, same dependencies.
 >
 > The only change is WHERE the app runs - on isolated compute, instead of shared compute.
+
+**[2.4.4 - Physical Verification]**
+> We can verify the app is actually running on the isolated Diego cell by comparing IP addresses. The app's instance IP matches the isolated cell IP - proving physical isolation.
+
+**[2.4.5 - Closing Summary]**
+> To summarize: the developer ran one command - "cf restage" - and their application is now running on dedicated isolated infrastructure. No code changes, no route changes, no pipeline changes.
 
 **[KEY MESSAGE BOX]**
 > **Zero code changes. Zero route changes. Zero pipeline changes. Just restage.**
@@ -226,13 +238,13 @@ Use these phrases consistently throughout the narration:
 |---------|-------|-----|----------|
 | Introduction | 0:00 | 0:45 | 45 sec |
 | Scene 1.1 - Tile Acquisition | 0:45 | 2:30 | 1:45 |
-| Scene 1.2 - Ops Manager | 2:30 | 5:30 | 3:00 |
-| Scene 1.3 - Registration | 5:30 | 7:00 | 1:30 |
-| Scene 1.4 - Validation | 7:00 | 11:00 | 4:00 |
+| Scene 1.2 - Ops Manager Installation | 2:30 | 5:30 | 3:00 |
+| Scene 1.3 - Segment Registration | 5:30 | 7:30 | 2:00 |
+| Scene 1.4 - Operator Validation | 7:30 | 11:00 | 3:30 |
 | Scene 2.1 - Before State | 11:00 | 13:00 | 2:00 |
-| Scene 2.2 - Notice | 13:00 | 14:00 | 1:00 |
-| Scene 2.3 - Restage | 14:00 | 16:00 | 2:00 |
-| Scene 2.4 - Verification | 16:00 | 19:00 | 3:00 |
+| Scene 2.2 - Migration Notice | 13:00 | 14:00 | 1:00 |
+| Scene 2.3 - Developer Performs Restage | 14:00 | 16:00 | 2:00 |
+| Scene 2.4 - Developer Verification | 16:00 | 19:00 | 3:00 |
 | Closing | 19:00 | 20:00 | 1:00 |
 | **Total** | | | **~20 min** |
 
