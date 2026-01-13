@@ -67,17 +67,11 @@ act1_scene1() {
     show_command './scripts/isolation-segment-tile-migration.sh download-tile \
   --version 10.2.5+LTS-T \
   --output-directory ~/Downloads' "Download isolation segment tile from Pivnet"
-    echo ""
-    echo -e "${YELLOW}✓ Already completed - tile pre-downloaded for demo${NC}"
-    echo ""
     wait_for_enter || return
 
     show_command './scripts/isolation-segment-tile-migration.sh download-replicator \
   --version 10.2.5+LTS-T \
   --output-directory ~/Downloads' "Download Replicator tool"
-    echo ""
-    echo -e "${YELLOW}✓ Already completed - replicator pre-downloaded for demo${NC}"
-    echo ""
     wait_for_enter || return
 
     show_command './scripts/isolation-segment-tile-migration.sh replicate-tile \
@@ -86,7 +80,7 @@ act1_scene1() {
   --output ~/Downloads' "Create the large-cell replicated tile"
     echo ""
     echo -e "${YELLOW}Under the hood, this runs:${NC}"
-    echo -e "${BLUE}/tmp/replicator \\
+    echo -e "${BLUE}~/Downloads/replicator \\
   --name large-cell \\
   --path ~/Downloads/p-isolation-segment-10.2.5-build.2.pivotal \\
   --output ~/Downloads/p-isolation-segment-large-cell-10.2.5.pivotal${NC}"
@@ -110,8 +104,8 @@ act1_scene2() {
 
     marker "[BROWSER] Configure tile in Ops Manager UI"
     marker "- Assign AZs and Networks"
+    marker "- Networking: Certificate and private key for the isolation segment uses the same certificate and private key used by the TAS Gorouter since we're not separate Gorouter instances"
     marker "- Isolated Diego Cells: 1 cell"
-    marker "- Networking: 0 routers (shared routing)"
     wait_for_enter || return
 
     marker "[BROWSER] Review Pending Changes → Apply Changes"
@@ -214,32 +208,18 @@ act2_scene1() {
 act2_scene2() {
     scene "Scene 2.2: Migration Notice"
 
-    show_command 'cat << '"'"'EOF'"'"'
-================================================================================
-PLATFORM NOTIFICATION
+    show_command 'cf set-space-isolation-segment dev-space large-cell' "Operator assigns space to isolation segment"
+    wait_for_enter || return
 
-Subject: Isolation Segment Migration - Action Required
-
-Your space '"'"'dev-space'"'"' has been assigned to isolation segment '"'"'large-cell'"'"'
-for improved resource allocation and workload isolation.
-
-ACTION REQUIRED:
-  Please restage your applications by Friday, January 17, 2026 to
-  complete the migration.
-
-  Command: cf restage <app-name>
-
-Questions? Contact platform-team@example.com
-================================================================================
-EOF' "Display migration notification"
+    show_command './scripts/send-developer-notification.sh' "Send notification to Developer window"
+    echo ""
+    echo -e "${YELLOW}This sends the migration notice to the Developer terminal via AppleScript${NC}"
+    echo ""
     wait_for_enter || return
 }
 
 act2_scene3() {
     scene "Scene 2.3: Developer Performs Restage"
-
-    show_command 'cf set-space-isolation-segment dev-space large-cell' "Platform operator assigns space to segment"
-    wait_for_enter || return
 
     show_command 'cf space dev-space' "Developer verifies space assignment"
     wait_for_enter || return
