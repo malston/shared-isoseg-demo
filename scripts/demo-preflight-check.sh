@@ -168,14 +168,20 @@ check_demo_prerequisites() {
     # Check spaces exist (need to target org first)
     # Target demo-org to check spaces
     if cf target -o demo-org &> /dev/null 2>&1; then
-        for space in dev-space iso-validation; do
-            if cf space "$space" &> /dev/null 2>&1; then
-                check_pass "Space '$space' exists in demo-org"
-            else
-                check_fail "Space '$space' not found in demo-org"
-                check_info "Create with: cf create-space $space -o demo-org"
-            fi
-        done
+        # dev-space is required (contains Spring Music app)
+        if cf space "dev-space" &> /dev/null 2>&1; then
+            check_pass "Space 'dev-space' exists in demo-org"
+        else
+            check_fail "Space 'dev-space' not found in demo-org"
+            check_info "Create with: cf create-space dev-space -o demo-org"
+        fi
+        # iso-validation is created during the demo, so just warn if it exists
+        if cf space "iso-validation" &> /dev/null 2>&1; then
+            check_warn "Space 'iso-validation' already exists (will be recreated in demo)"
+            check_info "To reset: cf delete-space iso-validation -o demo-org -f"
+        else
+            check_pass "Space 'iso-validation' does not exist (will be created in demo)"
+        fi
     else
         check_warn "Could not target demo-org to check spaces"
     fi
