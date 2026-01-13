@@ -164,6 +164,9 @@ Walk through key configuration sections:
 ```bash
 # Register the segment in Cloud Controller
 cf create-isolation-segment large-cell
+
+# Verify segment is registered
+cf isolation-segments
 ```
 
 > **Narration cue**: "We register the segment name with Cloud Foundry's Cloud Controller."
@@ -173,31 +176,33 @@ cf create-isolation-segment large-cell
 ```bash
 # Allow the demo org to use this segment
 cf enable-org-isolation demo-org large-cell
+
+# Verify org entitlement (shows "isolation segments: large-cell")
+cf org demo-org
 ```
 
 > **Narration cue**: "Organizations must be explicitly entitled to use each isolation segment."
 
-#### 1.3.3 - Assign Segment to Validation Space
+#### 1.3.3 - Create Validation Space
 
 ```bash
-# Assign to operator's test space
-cf set-space-isolation-segment iso-validation large-cell
+# Create operator's test space
+cf create-space iso-validation -o demo-org
 ```
 
-> **Narration cue**: "Before notifying developers, we'll validate the segment with a test application."
+> **Narration cue**: "We create a dedicated validation space separate from developer workspaces."
 
-#### 1.3.4 - Verify Segment Configuration
+#### 1.3.4 - Assign Space to Segment
 
 ```bash
-# Confirm segment is registered
-cf isolation-segments
+# Assign validation space to isolation segment
+cf set-space-isolation-segment iso-validation large-cell
 
-# Confirm org entitlement (shows "isolation segments: large-cell")
-cf org demo-org
-
-# Confirm space assignment
+# Verify space assignment
 cf space iso-validation
 ```
+
+> **Narration cue**: "Apps pushed to this space will now run on the isolated Diego cells."
 
 ---
 

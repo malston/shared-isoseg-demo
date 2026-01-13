@@ -128,19 +128,19 @@ act1_scene3() {
     show_command 'cf create-isolation-segment large-cell' "Register segment in Cloud Controller"
     wait_for_enter || return
 
+    show_command 'cf isolation-segments' "Verify segment is registered"
+    wait_for_enter || return
+
     show_command 'cf enable-org-isolation demo-org large-cell' "Enable for organization"
+    wait_for_enter || return
+
+    show_command 'cf org demo-org' "Verify org entitlement (shows isolation segments)"
     wait_for_enter || return
 
     show_command 'cf create-space iso-validation -o demo-org' "Create validation space for operator testing"
     wait_for_enter || return
 
     show_command 'cf set-space-isolation-segment iso-validation large-cell' "Assign validation space to segment"
-    wait_for_enter || return
-
-    show_command 'cf isolation-segments' "Verify segment is registered"
-    wait_for_enter || return
-
-    show_command 'cf org demo-org' "Verify org entitlement (shows isolation segments)"
     wait_for_enter || return
 
     show_command 'cf space iso-validation' "Verify space assignment"
