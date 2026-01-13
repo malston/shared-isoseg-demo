@@ -168,13 +168,13 @@ act1_scene4() {
     show_command 'cf space iso-validation' "Verify space shows isolation segment"
     wait_for_enter || return
 
-    show_command 'DEPLOY=$(bosh deployments --json | jq -r '"'"'.Tables[0].Rows[] | select(.name | startswith("p-isolation-segment-large-cell")) | .name'"'"')
+    show_command 'DEPLOYMENT=$(bosh deployments --json | jq -r '"'"'.Tables[0].Rows[] | select(.name | startswith("p-isolation-segment-large-cell")) | .name'"'"')
 echo "App running on: $(curl -s "https://$(cf app cf-env-test | grep routes | awk '"'"'{print $2}'"'"')/env" | grep CF_INSTANCE_IP | cut -d= -f2)"
-echo "Large-cell Diego: $(bosh -d $DEPLOY instances --json 2>/dev/null | jq -r '"'"'.Tables[0].Rows[0].ips'"'"')"' "Verify app running on isolated cell (IP comparison)"
+echo "Large-cell Diego: $(bosh -d $DEPLOYMENT instances --json 2>/dev/null | jq -r '"'"'.Tables[0].Rows[0].ips'"'"')"' "Verify app running on isolated cell (IP comparison)"
     wait_for_enter || return
 
-    show_command 'DEPLOY=$(bosh deployments --json | jq -r '"'"'.Tables[0].Rows[] | select(.name | startswith("p-isolation-segment-large-cell")) | .name'"'"')
-bosh -d $DEPLOY ssh isolated_diego_cell_large_cell/0 \
+    show_command 'DEPLOYMENT=$(bosh deployments --json | jq -r '"'"'.Tables[0].Rows[] | select(.name | startswith("p-isolation-segment-large-cell")) | .name'"'"')
+bosh -d $DEPLOYMENT ssh isolated_diego_cell_large_cell/0 \
   -c "cat /var/vcap/jobs/rep/config/rep.json | jq .placement_tags"' "Verify BOSH placement tags on isolated cell"
     echo ""
     echo -e "${YELLOW}Expected output: [\"large-cell\"]${NC}"
@@ -263,9 +263,9 @@ act2_scene4() {
     show_command 'cf app spring-music | grep -E "routes|memory|buildpack"' "Highlight zero changes required"
     wait_for_enter || return
 
-    show_command 'DEPLOY=$(bosh deployments --json | jq -r '"'"'.Tables[0].Rows[] | select(.name | startswith("p-isolation-segment-large-cell")) | .name'"'"')
+    show_command 'DEPLOYMENT=$(bosh deployments --json | jq -r '"'"'.Tables[0].Rows[] | select(.name | startswith("p-isolation-segment-large-cell")) | .name'"'"')
 echo "App running on: $(cf curl /v3/apps/$(cf app spring-music --guid)/processes/web/stats 2>/dev/null | jq -r '"'"'.resources[0].host'"'"')"
-echo "Large-cell Diego: $(bosh -d $DEPLOY instances --json 2>/dev/null | jq -r '"'"'.Tables[0].Rows[0].ips'"'"')"' "Verify app running on isolated cell"
+echo "Large-cell Diego: $(bosh -d $DEPLOYMENT instances --json 2>/dev/null | jq -r '"'"'.Tables[0].Rows[0].ips'"'"')"' "Verify app running on isolated cell"
     wait_for_enter || return
 
     show_command 'echo "✓ Confirmed: spring-music is running on the large-cell isolation segment"' "Confirm isolation"
