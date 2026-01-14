@@ -297,7 +297,8 @@ download_tile() {
         if [[ ! "$reply" =~ ^[Yy]$ ]]; then
             info "Skipping download. Using existing file."
             info ""
-            info "Next step: Install the tile"
+            info "Next step: Download the replicator and install the tile"
+            info "  $0 download-replicator --version \"$version\" --output-directory \"$output_dir\""
             info "  $0 install-tile --tile-path \"$existing_file\""
             return 0
         fi

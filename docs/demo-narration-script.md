@@ -9,7 +9,7 @@
 
 **[0:00 - 0:45]** *Show title slide or Ops Manager dashboard*
 
-> Today we'll demonstrate how to deploy and use isolation segments with shared routing in Tanzu Application Service.
+> Today we'll demonstrate how to deploy and use isolation segments with shared routing in Tanzu Application Service (i.e. no additional go routers).
 >
 > Isolation segments provide workload isolation at the compute layer - your applications run on dedicated Diego cells, separate from other tenants. But here's the key: with shared routing, developers experience zero disruption. Same routes, same deployment commands, same behavior.
 >

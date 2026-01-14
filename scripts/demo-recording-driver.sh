@@ -144,10 +144,16 @@ act1_scene3() {
 act1_scene4() {
     scene "Scene 1.4: Operator Validation"
 
+    show_command 'cf target -o demo-org && cf create-space iso-validation' "Create validation space (OK if exists)"
+    wait_for_enter || return
+
+    show_command 'cf set-space-isolation-segment iso-validation large-cell' "Assign space to isolation segment"
+    wait_for_enter || return
+
     show_command 'cf target -o demo-org -s iso-validation' "Target the validation space"
     wait_for_enter || return
 
-    show_command 'cd apps/cf-env && cf push cf-env-test -m 64M -k 128M && cd ../..' "Deploy test application"
+    show_command 'cf push cf-env-test -b go_buildpack -m 64M -k 128M -p apps/cf-env' "Deploy test application"
     wait_for_enter || return
 
     show_command 'cf app cf-env-test' "Verify app is running"
@@ -276,13 +282,41 @@ cleanup_demo() {
     echo ""
 
     echo "Cleaning up CF resources..."
+
+    # Target dev-space and reset isolation segment
+    echo "  Resetting dev-space isolation segment..."
     cf target -o demo-org -s dev-space 2>/dev/null || true
-    cf delete cf-env-test -f 2>/dev/null || true
     cf reset-space-isolation-segment dev-space 2>/dev/null || true
-    cf reset-space-isolation-segment iso-validation 2>/dev/null || true
-    cf delete-space iso-validation -o demo-org -f 2>/dev/null || true
-    cf disable-org-isolation demo-org large-cell >/dev/null 2>&1 || true
-    cf delete-isolation-segment large-cell -f 2>/dev/null || true
+
+    # Restage spring-music only if it's running on an isolation segment
+    if cf app spring-music 2>/dev/null | grep -q "^isolation segment:"; then
+        echo "  Restaging spring-music to move back to shared Diego cells..."
+        cf restage spring-music 2>/dev/null || true
+    else
+        echo "  spring-music not on isolation segment (skipping restage)"
+    fi
+
+    # Clean up iso-validation space
+    echo "  Cleaning up iso-validation space..."
+    if cf target -o demo-org -s iso-validation &>/dev/null; then
+        cf delete cf-env-test -f 2>/dev/null || true
+        cf reset-space-isolation-segment iso-validation 2>/dev/null || true
+        cf delete-space iso-validation -o demo-org -f 2>/dev/null || true
+    fi
+
+    # Only cleanup isolation segment if it exists
+    if cf isolation-segments 2>/dev/null | grep -q "large-cell"; then
+        # Disable org isolation (must be after all spaces are reset)
+        echo "  Disabling org isolation for demo-org..."
+        cf disable-org-isolation demo-org large-cell 2>/dev/null || true
+
+        # Delete isolation segment
+        echo "  Deleting large-cell isolation segment..."
+        cf delete-isolation-segment large-cell -f || echo "    Warning: Could not delete isolation segment"
+    else
+        echo "  Isolation segment 'large-cell' does not exist (already cleaned up)"
+    fi
+
     rm -f ~/Downloads/p-isolation-segment-large-cell-10.2.5.pivotal
 
     echo ""
