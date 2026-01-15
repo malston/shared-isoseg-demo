@@ -67,17 +67,11 @@ act1_scene1() {
     show_command './scripts/isolation-segment-tile-migration.sh download-tile \
   --version 10.2.5+LTS-T \
   --output-directory ~/Downloads' "Download isolation segment tile from Pivnet"
-    echo ""
-    echo -e "${YELLOW}✓ Already completed - tile pre-downloaded for demo${NC}"
-    echo ""
     wait_for_enter || return
 
     show_command './scripts/isolation-segment-tile-migration.sh download-replicator \
   --version 10.2.5+LTS-T \
   --output-directory ~/Downloads' "Download Replicator tool"
-    echo ""
-    echo -e "${YELLOW}✓ Already completed - replicator pre-downloaded for demo${NC}"
-    echo ""
     wait_for_enter || return
 
     show_command './scripts/isolation-segment-tile-migration.sh replicate-tile \
@@ -86,7 +80,7 @@ act1_scene1() {
   --output ~/Downloads' "Create the large-cell replicated tile"
     echo ""
     echo -e "${YELLOW}Under the hood, this runs:${NC}"
-    echo -e "${BLUE}/tmp/replicator \\
+    echo -e "${BLUE}~/Downloads/replicator \\
   --name large-cell \\
   --path ~/Downloads/p-isolation-segment-10.2.5-build.2.pivotal \\
   --output ~/Downloads/p-isolation-segment-large-cell-10.2.5.pivotal${NC}"
@@ -110,8 +104,8 @@ act1_scene2() {
 
     marker "[BROWSER] Configure tile in Ops Manager UI"
     marker "- Assign AZs and Networks"
+    marker "- Networking: Certificate and private key for the isolation segment uses the same certificate and private key used by the TAS Gorouter since we're not separate Gorouter instances"
     marker "- Isolated Diego Cells: 1 cell"
-    marker "- Networking: 0 routers (shared routing)"
     wait_for_enter || return
 
     marker "[BROWSER] Review Pending Changes → Apply Changes"
@@ -125,6 +119,9 @@ act1_scene2() {
 act1_scene3() {
     scene "Scene 1.3: Segment Registration"
 
+    show_command 'cf isolation-segments' "Verify no isolation segment is registered"
+    wait_for_enter || return
+
     show_command 'cf create-isolation-segment large-cell' "Register segment in Cloud Controller"
     wait_for_enter || return
 
@@ -136,8 +133,21 @@ act1_scene3() {
 
     show_command 'cf org demo-org' "Verify org entitlement (shows isolation segments)"
     wait_for_enter || return
+}
+
+act1_scene4() {
+    scene "Scene 1.4: Operator Validation"
+
+    show_command 'cf target -o demo-org' "Target the demo org"
+    wait_for_enter || return
+
+    show_command 'cf spaces' "Show spaces in org (none assigned to segment yet)"
+    wait_for_enter || return
 
     show_command 'cf create-space iso-validation -o demo-org' "Create validation space for operator testing"
+    wait_for_enter || return
+
+    show_command 'cf target -o demo-org -s iso-validation' "Target the validation space"
     wait_for_enter || return
 
     show_command 'cf set-space-isolation-segment iso-validation large-cell' "Assign validation space to segment"
@@ -145,15 +155,8 @@ act1_scene3() {
 
     show_command 'cf space iso-validation' "Verify space assignment"
     wait_for_enter || return
-}
 
-act1_scene4() {
-    scene "Scene 1.4: Operator Validation"
-
-    show_command 'cf target -o demo-org -s iso-validation' "Target the validation space"
-    wait_for_enter || return
-
-    show_command 'cd apps/cf-env && cf push cf-env-test -m 64M -k 128M && cd ../..' "Deploy test application"
+    show_command 'cf push cf-env-test -b go_buildpack -m 64M -k 128M -p apps/cf-env' "Deploy test application"
     wait_for_enter || return
 
     show_command 'cf app cf-env-test' "Verify app is running"
@@ -162,10 +165,11 @@ act1_scene4() {
     show_command 'cf routes' "Show routes in space"
     wait_for_enter || return
 
-    marker "[BROWSER] Open app URL to show it responds"
+    show_command 'cf space iso-validation' "Verify space shows isolation segment"
     wait_for_enter || return
 
-    show_command 'cf space iso-validation' "Verify space shows isolation segment"
+    marker "cURL app URL to show it responds"
+    show_command 'curl -s "https://$(cf app cf-env-test | grep routes | awk '"'"'{print $2}'"'"')" | grep -i cf_instance_ip' "Show app environment variables (should include CF_INSTANCE_IP)"
     wait_for_enter || return
 
     show_command 'DEPLOYMENT=$(bosh deployments --json | jq -r '"'"'.Tables[0].Rows[] | select(.name | startswith("p-isolation-segment-large-cell")) | .name'"'"')
@@ -214,32 +218,18 @@ act2_scene1() {
 act2_scene2() {
     scene "Scene 2.2: Migration Notice"
 
-    show_command 'cat << '"'"'EOF'"'"'
-================================================================================
-PLATFORM NOTIFICATION
+    show_command 'cf set-space-isolation-segment dev-space large-cell' "Operator assigns space to isolation segment"
+    wait_for_enter || return
 
-Subject: Isolation Segment Migration - Action Required
-
-Your space '"'"'dev-space'"'"' has been assigned to isolation segment '"'"'large-cell'"'"'
-for improved resource allocation and workload isolation.
-
-ACTION REQUIRED:
-  Please restage your applications by Friday, January 17, 2026 to
-  complete the migration.
-
-  Command: cf restage <app-name>
-
-Questions? Contact platform-team@example.com
-================================================================================
-EOF' "Display migration notification"
+    show_command './scripts/send-developer-notification.sh' "Send notification to Developer window"
+    echo ""
+    echo -e "${YELLOW}This sends the migration notice to the Developer terminal via AppleScript${NC}"
+    echo ""
     wait_for_enter || return
 }
 
 act2_scene3() {
     scene "Scene 2.3: Developer Performs Restage"
-
-    show_command 'cf set-space-isolation-segment dev-space large-cell' "Platform operator assigns space to segment"
-    wait_for_enter || return
 
     show_command 'cf space dev-space' "Developer verifies space assignment"
     wait_for_enter || return
@@ -296,13 +286,41 @@ cleanup_demo() {
     echo ""
 
     echo "Cleaning up CF resources..."
+
+    # Target dev-space and reset isolation segment
+    echo "  Resetting dev-space isolation segment..."
     cf target -o demo-org -s dev-space 2>/dev/null || true
-    cf delete cf-env-test -f 2>/dev/null || true
     cf reset-space-isolation-segment dev-space 2>/dev/null || true
-    cf reset-space-isolation-segment iso-validation 2>/dev/null || true
-    cf delete-space iso-validation -o demo-org -f 2>/dev/null || true
-    cf disable-org-isolation demo-org large-cell >/dev/null 2>&1 || true
-    cf delete-isolation-segment large-cell -f 2>/dev/null || true
+
+    # Restage spring-music only if it's running on an isolation segment
+    if cf app spring-music 2>/dev/null | grep -q "^isolation segment:"; then
+        echo "  Restaging spring-music to move back to shared Diego cells..."
+        cf restage spring-music 2>/dev/null || true
+    else
+        echo "  spring-music not on isolation segment (skipping restage)"
+    fi
+
+    # Clean up iso-validation space
+    echo "  Cleaning up iso-validation space..."
+    if cf target -o demo-org -s iso-validation &>/dev/null; then
+        cf delete cf-env-test -f 2>/dev/null || true
+        cf reset-space-isolation-segment iso-validation 2>/dev/null || true
+        cf delete-space iso-validation -o demo-org -f 2>/dev/null || true
+    fi
+
+    # Only cleanup isolation segment if it exists
+    if cf isolation-segments 2>/dev/null | grep -q "large-cell"; then
+        # Disable org isolation (must be after all spaces are reset)
+        echo "  Disabling org isolation for demo-org..."
+        cf disable-org-isolation demo-org large-cell 2>/dev/null || true
+
+        # Delete isolation segment
+        echo "  Deleting large-cell isolation segment..."
+        cf delete-isolation-segment large-cell -f || echo "    Warning: Could not delete isolation segment"
+    else
+        echo "  Isolation segment 'large-cell' does not exist (already cleaned up)"
+    fi
+
     rm -f ~/Downloads/p-isolation-segment-large-cell-10.2.5.pivotal
 
     echo ""

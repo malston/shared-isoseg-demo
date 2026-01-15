@@ -271,15 +271,39 @@ download_tile() {
         version_regex="^${version}\.[0-9]+.*"
         version_desc="${version}.x (latest patch)"
     else
-        # Full version with patch (e.g., 6.0.23, 10.2.6) - download exact version
+        # Full version with patch (e.g., 6.0.23, 10.2.6+LTS-T) - download exact version
+        # Escape regex special characters in version string (especially + for LTS versions)
+        local escaped_version
+        escaped_version=$(printf '%s' "$version" | sed 's/[.+^$*?\\[\]{}()|]/\\&/g')
         file_glob="p-isolation-segment-${version}*"
-        version_regex="^${version}.*"
+        version_regex="^${escaped_version}$"
         version_desc="$version (exact version)"
     fi
 
     info "Downloading Isolation Segment tile from Pivnet"
     info "  Version: $version_desc"
     info "  Output: $output_dir"
+
+    # Check if tile already exists
+    # Extract base version (strip +LTS-T suffix if present) for filename matching
+    local base_version="${version%%+*}"
+    local existing_file
+    existing_file=$(find "$output_dir" -maxdepth 1 -name "p-isolation-segment-${base_version}*.pivotal" -type f 2>/dev/null | head -1)
+
+    if [[ -n "$existing_file" ]]; then
+        warn "Tile already exists: $existing_file"
+        local reply
+        read -r -p "Re-download and overwrite? [y/N] " reply
+        if [[ ! "$reply" =~ ^[Yy]$ ]]; then
+            info "Skipping download. Using existing file."
+            info ""
+            info "Next step: Download the replicator and install the tile"
+            info "  $0 download-replicator --version \"$version\" --output-directory \"$output_dir\""
+            info "  $0 install-tile --tile-path \"$existing_file\""
+            return 0
+        fi
+        info "Overwriting existing tile..."
+    fi
 
     if [[ "$DRY_RUN" == "true" ]]; then
         warn "DRY RUN: Would download p-isolation-segment $version_desc to $output_dir"
@@ -405,6 +429,23 @@ download_replicator() {
     info "  Release version: $version"
     info "  Output: $output_dir"
 
+    # Check if replicator already exists
+    local existing_replicator="${output_dir}/replicator"
+    if [[ -x "$existing_replicator" ]]; then
+        local replicator_version="unknown"
+        if [[ -f "${output_dir}/replicator.version" ]]; then
+            replicator_version=$(cat "${output_dir}/replicator.version")
+        fi
+        warn "Replicator already exists: $existing_replicator (version: $replicator_version)"
+        local reply
+        read -r -p "Re-download and overwrite? [y/N] " reply
+        if [[ ! "$reply" =~ ^[Yy]$ ]]; then
+            info "Skipping download. Using existing replicator."
+            return 0
+        fi
+        info "Overwriting existing replicator..."
+    fi
+
     if [[ "$DRY_RUN" == "true" ]]; then
         warn "DRY RUN: Would download Replicator for release $version to $output_dir"
         return 0
@@ -521,17 +562,24 @@ download_replicator() {
     cp "$binary_name" "$target_path" || fatal "Failed to copy binary to $target_path"
     chmod +x "$target_path"
 
+    # Extract and save version from zip filename (e.g., replicator-0.18.0.zip -> 0.18.0)
+    local replicator_version
+    replicator_version=$(echo "$zip_file" | sed -E 's/.*replicator-([0-9]+\.[0-9]+\.[0-9]+)\.zip/\1/')
+    if [[ -n "$replicator_version" && "$replicator_version" != "$zip_file" ]]; then
+        echo "$replicator_version" > "${output_dir}/replicator.version"
+    fi
+
     # Cleanup
     cd - > /dev/null || true
     rm -rf "$temp_dir"
 
-    success "Installed: $target_path"
+    success "Installed: $target_path (version: ${replicator_version:-unknown})"
     info ""
     info "Replicator usage example:"
-    info "  $target_path \\"
-    info "    --name \"second-segment\" \\"
-    info "    --path /path/to/p-isolation-segment.pivotal \\"
-    info "    --output /path/to/second-segment.pivotal"
+    echo -e "${BLUE}  $target_path \\\\${NC}"
+    echo -e "${BLUE}    --name \"second-segment\" \\\\${NC}"
+    echo -e "${BLUE}    --path /path/to/p-isolation-segment.pivotal \\\\${NC}"
+    echo -e "${BLUE}    --output /path/to/second-segment.pivotal${NC}"
 }
 
 #######################################
