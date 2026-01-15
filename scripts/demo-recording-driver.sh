@@ -119,6 +119,9 @@ act1_scene2() {
 act1_scene3() {
     scene "Scene 1.3: Segment Registration"
 
+    show_command 'cf isolation-segments' "Verify no isolation segment is registered"
+    wait_for_enter || return
+
     show_command 'cf create-isolation-segment large-cell' "Register segment in Cloud Controller"
     wait_for_enter || return
 
@@ -130,27 +133,27 @@ act1_scene3() {
 
     show_command 'cf org demo-org' "Verify org entitlement (shows isolation segments)"
     wait_for_enter || return
+}
+
+act1_scene4() {
+    scene "Scene 1.4: Operator Validation"
+
+    show_command 'cf target -o demo-org' "Target the demo org"
+    wait_for_enter || return
+
+    show_command 'cf spaces' "Show spaces in org (none assigned to segment yet)"
+    wait_for_enter || return
 
     show_command 'cf create-space iso-validation -o demo-org' "Create validation space for operator testing"
+    wait_for_enter || return
+
+    show_command 'cf target -o demo-org -s iso-validation' "Target the validation space"
     wait_for_enter || return
 
     show_command 'cf set-space-isolation-segment iso-validation large-cell' "Assign validation space to segment"
     wait_for_enter || return
 
     show_command 'cf space iso-validation' "Verify space assignment"
-    wait_for_enter || return
-}
-
-act1_scene4() {
-    scene "Scene 1.4: Operator Validation"
-
-    show_command 'cf target -o demo-org && cf create-space iso-validation' "Create validation space (OK if exists)"
-    wait_for_enter || return
-
-    show_command 'cf set-space-isolation-segment iso-validation large-cell' "Assign space to isolation segment"
-    wait_for_enter || return
-
-    show_command 'cf target -o demo-org -s iso-validation' "Target the validation space"
     wait_for_enter || return
 
     show_command 'cf push cf-env-test -b go_buildpack -m 64M -k 128M -p apps/cf-env' "Deploy test application"
@@ -162,10 +165,11 @@ act1_scene4() {
     show_command 'cf routes' "Show routes in space"
     wait_for_enter || return
 
-    marker "[BROWSER] Open app URL to show it responds"
+    show_command 'cf space iso-validation' "Verify space shows isolation segment"
     wait_for_enter || return
 
-    show_command 'cf space iso-validation' "Verify space shows isolation segment"
+    marker "cURL app URL to show it responds"
+    show_command 'curl -s "https://$(cf app cf-env-test | grep routes | awk '"'"'{print $2}'"'"')" | grep -i cf_instance_ip' "Show app environment variables (should include CF_INSTANCE_IP)"
     wait_for_enter || return
 
     show_command 'DEPLOYMENT=$(bosh deployments --json | jq -r '"'"'.Tables[0].Rows[] | select(.name | startswith("p-isolation-segment-large-cell")) | .name'"'"')
